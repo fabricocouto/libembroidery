@@ -7042,8 +7042,11 @@ static char readPes(EmbPattern* pattern, FILE* file, const char* fileName)
     for (x = 0; x < numColors; x++) {
         embPattern_addThread(pattern, load_thread(pec_thread, embBuffer[x]));
     }
-
-    fseek(file, pecstart + 532, SEEK_SET);
+    
+    
+    //fseek(file, pecstart + 532, SEEK_SET);
+    //this is the correct offset form for the pes file. 
+    fseek(file, pecstart + 528, SEEK_SET);
     readPecStitches(pattern, file, fileName);
 
     embPattern_flipVertical(pattern);
