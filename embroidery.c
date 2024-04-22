@@ -1313,8 +1313,8 @@ EmbBrand brand_codes[100] = {
  */
 #define DEFAULT_PLACE_VALUE        (0.1)
 
-/* INTERNAL POSTSCRIPT INTERPRETER
- * -------------------------------
+/* INTERNAL POSTSCRIPT-COMPATIBLE INTERPRETER
+ * ------------------------------------------
  *
  * Eventually we want all dependencies of libembroidery to be only c standard
  * libraries and we also need the interpreter to integrate well with our
@@ -1351,10 +1351,127 @@ static char postscript_data_type[][20] = {
 #define LITERAL_ATTR                   0
 #define EXEC_ATTR                      1
 
-/* PostScript built-in identifiers */
-#define PS_FUNC_ADD                    0
-#define PS_FUNC_MUL                    1
-#define PS_FUNC_QUIT                   2
+/* PostScript's built-in identifiers
+ * (See the in_built_functions string table below.)
+ */
+/* 3.6.1 Stack */
+#define PS_FUNC_DUP                    0
+#define PS_FUNC_EXCH                   1
+#define PS_FUNC_POP                    2
+#define PS_FUNC_COPY                   3
+#define PS_FUNC_ROLL                   4
+#define PS_FUNC_INDEX                  5
+#define PS_FUNC_MARK                   6
+#define PS_FUNC_CLEAR                  7
+#define PS_FUNC_COUNT                  8
+#define PS_FUNC_COUNTTOMARK            9
+/* 3.6.2 Mathematical */
+#define PS_FUNC_ADD                   10
+#define PS_FUNC_SUB                   11
+#define PS_FUNC_MUL                   12
+#define PS_FUNC_DIV                   13
+#define PS_FUNC_IDIV                  14
+#define PS_FUNC_MOD                   15
+#define PS_FUNC_ABS                   16
+#define PS_FUNC_NEG                   17
+#define PS_FUNC_CEILING               18
+#define PS_FUNC_FLOOR                 19
+#define PS_FUNC_ROUND                 20
+#define PS_FUNC_TRUNCATE              21
+#define PS_FUNC_SQRT                  22
+#define PS_FUNC_EXP                   23
+#define PS_FUNC_LN                    24
+#define PS_FUNC_LOG                   25
+#define PS_FUNC_sin                   26
+#define PS_FUNC_cos                   27
+#define PS_FUNC_atan                  28
+#define PS_FUNC_rand                  29
+#define PS_FUNC_srand                 30
+#define PS_FUNC_rrand                 31
+/* 3.6.3 Array, Dictionary, String */
+#define PS_FUNC_get                   32
+#define PS_FUNC_put                   33
+#define PS_FUNC_copy                  34
+#define PS_FUNC_length                35
+#define PS_FUNC_getinterval           36
+#define PS_FUNC_putinterval           37
+/* Array-specific */
+#define PS_FUNC_aload                 38
+#define PS_FUNC_astore                39
+#define PS_FUNC_OPEN_SQ               40
+#define PS_FUNC_CLOSE_SQ              41
+#define PS_FUNC_setpacking            42
+#define PS_FUNC_currentpacking        43
+/* Dictionary-specific */
+#define PS_FUNC_begin                 44
+#define PS_FUNC_end                   45
+#define PS_FUNC_def                   46
+#define PS_FUNC_store                 47
+#define PS_FUNC_load                  48
+#define PS_FUNC_where                 49
+#define PS_FUNC_countdictstack        50
+#define PS_FUNC_cleardictstack        51
+#define PS_FUNC_dictstack             52
+#define PS_FUNC_known                 53
+#define PS_FUNC_maxlength             54
+#define PS_FUNC_undef                 55 /* Level 2 */
+#define PS_FUNC_left_arrow            56 /* Level 2 */
+#define PS_FUNC_right_arrow           57 /* Level 2 */
+/* String-specific */
+#define PS_FUNC_search                58
+#define PS_FUNC_anchorsearch          59
+#define PS_FUNC_token                 60
+/* 3.6.4 Boolean */
+#define PS_FUNC_eq                    61
+#define PS_FUNC_ne                    62
+#define PS_FUNC_gt                    63
+#define PS_FUNC_ge                    64
+#define PS_FUNC_le                    65
+#define PS_FUNC_lt                    66
+#define PS_FUNC_and                   67
+#define PS_FUNC_or                    68
+#define PS_FUNC_xor                   69
+#define PS_FUNC_true                  70
+#define PS_FUNC_false                 71
+#define PS_FUNC_not                   72
+/* 3.6.5 Control */
+#define PS_FUNC_if                    73
+#define PS_FUNC_ifelse                74
+#define PS_FUNC_exec                  75
+#define PS_FUNC_for                   76
+#define PS_FUNC_repeat                77
+#define PS_FUNC_loop                  78
+#define PS_FUNC_forall                79
+#define PS_FUNC_exit                  80
+#define PS_FUNC_countexecstack        81
+#define PS_FUNC_execstack             82
+#define PS_FUNC_stop                  83
+/* 3.6.6 Type */
+#define PS_FUNC_type                  84
+#define PS_FUNC_xcheck                85
+#define PS_FUNC_rcheck                86
+#define PS_FUNC_wcheck                87
+#define PS_FUNC_cvlit                 88
+#define PS_FUNC_cvx                   89
+#define PS_FUNC_readonly              90
+#define PS_FUNC_executeonly           91
+#define PS_FUNC_noaccess              92
+#define PS_FUNC_cvi                   93
+#define PS_FUNC_cvr                   94
+#define PS_FUNC_cvn                   95
+#define PS_FUNC_cvs                   96
+#define PS_FUNC_cvrs                  97
+/* 3.7.1 Memory */
+#define PS_FUNC_array                 98
+#define PS_FUNC_packedarray           99
+#define PS_FUNC_dict                 100
+#define PS_FUNC_string               101
+#define PS_FUNC_gstate               102
+/* 3.7.2 VM */
+#define PS_FUNC_save                 103
+#define PS_FUNC_restore              104
+#define PS_FUNC_userdict             105
+#define PS_FUNC_gcheck               106
 
 typedef struct EmbStackElement_ {
     int data_type;
@@ -1374,10 +1491,137 @@ int emb_repl(void);
 void execute_postscript(EmbStack *stack, char line[200]);
 void analyse_stack(EmbStack *stack);
 
+/* The PostScript Reference Manual (second edition) lists these commands and
+ * specifically requests that authors credit them as the copyright holder
+ * in order to protect their ownership of the language and de-facto interpreter.
+ *
+ * We reproduce it here in order to make our own filters and graphics features
+ * compatible with those found in graphic design for modern printers and
+ * scanners.
+ *
+ * The in_built_functions string table here is credited to:
+ *     Adobe Systems Incorporated "The PostScript(R) Reference Manual" (1990)
+ *     (Second Edition) Addison Wesley
+ */
 static char in_built_functions[][20] = {
+    /* 3.6.1 Stack */
+    "dup",
+    "exch",
+    "pop",
+    "copy",
+    "roll",
+    "index",
+    "mark",
+    "clear",
+    "count",
+    "counttomark",
+    /* 3.6.2 Mathematical */
     "add",
+    "sub",
     "mul",
-    "quit",
+    "div",
+    "idiv",
+    "mod",
+    "abs",
+    "neg",
+    "ceiling",
+    "floor",
+    "round",
+    "truncate",
+    "sqrt",
+    "exp",
+    "ln",
+    "log",
+    "sin",
+    "cos",
+    "atan",
+    "rand",
+    "srand",
+    "rrand",
+    /* 3.6.3 Array, Dictionary, String */
+    "get",
+    "put",
+    "copy",
+    "length",
+    "getinterval",
+    "putinterval",
+    /* Array-specific */
+    "aload",
+    "astore",
+    "[",
+    "]",
+    "setpacking",
+    "currentpacking",
+    /* Dictionary-specific */
+    "begin",
+    "end",
+    "def",
+    "store",
+    "load",
+    "where",
+    "countdictstack",
+    "cleardictstack",
+    "dictstack",
+    "known",
+    "maxlength",
+    "undef", /* Level 2 */
+    "<<", /* Level 2 */
+    ">>", /* Level 2 */
+    /* String-specific */
+    "search",
+    "anchorsearch",
+    "token",
+    /* 3.6.4 Boolean */
+    "eq",
+    "ne",
+    "gt",
+    "ge",
+    "le",
+    "lt",
+    "and",
+    "or",
+    "xor",
+    "true",
+    "false",
+    "not",
+    /* 3.6.5 Control */
+    "if",
+    "ifelse",
+    "exec",
+    "for",
+    "repeat",
+    "loop",
+    "forall",
+    "exit",
+    "countexecstack",
+    "execstack",
+    "stop",
+    /* 3.6.6 Type */
+    "type",
+    "xcheck",
+    "rcheck",
+    "wcheck",
+    "cvlit",
+    "cvx",
+    "readonly",
+    "executeonly",
+    "noaccess",
+    "cvi",
+    "cvr",
+    "cvn",
+    "cvs",
+    "cvrs",
+    /* 3.7.1 Memory */
+    "array",
+    "packedarray",
+    "dict",
+    "string",
+    "gstate",
+    /* 3.7.2 VM */
+    "save",
+    "restore",
+    "userdict",
+    "gcheck",
     ""
 };
 
@@ -1528,7 +1772,20 @@ token_is_int(EmbStackElement arg)
     return (arg.data_type == INT_TYPE);
 }
 
-#define GET_2_MORE_TOKENS() \
+#define GET_1_MORE_TOKEN \
+    if (stack->position < 1) { \
+        break; \
+    } \
+\
+    EmbStackElement arg1 = stack->stack[stack->position-2]; \
+    if (!token_is_int(arg1)) { \
+        break; \
+    } \
+\
+    stack_pop(stack); \
+    arg1 = stack_pop(stack);
+
+#define GET_2_MORE_TOKENS \
     if (stack->position < 2) { \
         break; \
     } \
@@ -1539,7 +1796,6 @@ token_is_int(EmbStackElement arg)
         break; \
     } \
 \
-    char token[200]; \
     stack_pop(stack); \
     arg2 = stack_pop(stack); \
     arg1 = stack_pop(stack);
@@ -1549,26 +1805,402 @@ token_is_int(EmbStackElement arg)
 int
 process_stack_head(EmbStack *stack)
 {
+    char token[200];
     EmbStackElement element = stack->stack[stack->position-1];
-    if (element.attribute) {
-        switch (element.i) {
-        case PS_FUNC_ADD: {
-            GET_2_MORE_TOKENS();
-            sprintf(token, "%d", atoi(arg1.s) + atoi(arg2.s));
-            stack_push(stack, token);
-            break;
-        }
-        case PS_FUNC_MUL: {
-            GET_2_MORE_TOKENS();
-            sprintf(token, "%d", atoi(arg1.s) * atoi(arg2.s));
-            stack_push(stack, token);
-            break;
-        }
-        default: {
-            printf("ERROR: Postscript built-in %d not indexed.\n", element.i);
-            break;
-        }
-        }
+    if (!element.attribute) {
+        return;
+    }
+    switch (element.i) {
+    /* 3.6.1 Stack */
+    case PS_FUNC_DUP: {
+        GET_1_MORE_TOKEN
+        stack_push(stack, arg1.s);
+        stack_push(stack, arg1.s);
+        break;
+    }
+    case PS_FUNC_EXCH: {
+        break;
+    }
+    case PS_FUNC_POP: {
+        stack_pop(stack);
+        break;
+    }
+    case PS_FUNC_COPY: {
+        break;
+    }
+    case PS_FUNC_ROLL: {
+        break;
+    }
+    case PS_FUNC_INDEX: {
+        break;
+    }
+    case PS_FUNC_MARK: {
+        break;
+    }
+    case PS_FUNC_CLEAR: {
+        break;
+    }
+    case PS_FUNC_COUNT: {
+        break;
+    }
+    case PS_FUNC_COUNTTOMARK: {
+        break;
+    }
+    /* 3.6.2 Mathematical */
+    case PS_FUNC_ADD: {
+        GET_2_MORE_TOKENS
+        sprintf(token, "%d", atoi(arg1.s) + atoi(arg2.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_SUB: {
+        GET_2_MORE_TOKENS
+        sprintf(token, "%d", atoi(arg1.s) - atoi(arg2.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_MUL: {
+        GET_2_MORE_TOKENS
+        sprintf(token, "%d", atoi(arg1.s) * atoi(arg2.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_DIV: {
+        GET_2_MORE_TOKENS
+        sprintf(token, "%f", atof(arg1.s) / atof(arg2.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_IDIV: {
+        GET_2_MORE_TOKENS
+        sprintf(token, "%d", atoi(arg1.s) / atoi(arg2.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_MOD: {
+        GET_2_MORE_TOKENS
+        sprintf(token, "%d", atoi(arg1.s) % atoi(arg2.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_ABS: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%d", abs(atoi(arg1.s)));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_NEG: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%d", -atoi(arg1.s));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_CEILING: {
+        break;
+    }
+    case PS_FUNC_FLOOR: {
+        break;
+    }
+    case PS_FUNC_ROUND: {
+        break;
+    }
+    case PS_FUNC_TRUNCATE: {
+        break;
+    }
+    case PS_FUNC_SQRT: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%f", sqrt(atof(arg1.s)));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_EXP: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%f", exp(atof(arg1.s)));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_LN: {
+        break;
+    }
+    case PS_FUNC_LOG: {
+        break;
+    }
+    case PS_FUNC_sin: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%f", sin(atof(arg1.s)));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_cos: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%f", cos(atof(arg1.s)));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_atan: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%f", atan(atof(arg1.s)));
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_rand: {
+        GET_1_MORE_TOKEN
+        sprintf(token, "%d", rand());
+        stack_push(stack, token);
+        break;
+    }
+    case PS_FUNC_srand: {
+        GET_1_MORE_TOKEN
+        srand(atoi(arg1.s));
+        break;
+    }
+    case PS_FUNC_rrand: {
+        break;
+    }
+    /* 3.6.3 Array, Dictionary, String */
+    case PS_FUNC_get: {
+        break;
+    }
+    case PS_FUNC_put: {
+        break;
+    }
+    case PS_FUNC_copy: {
+        break;
+    }
+    case PS_FUNC_length: {
+        break;
+    }
+    case PS_FUNC_getinterval: {
+        break;
+    }
+    case PS_FUNC_putinterval: {
+        break;
+    }
+    /*     Array-specific */
+    case PS_FUNC_aload: {
+        break;
+    }
+    case PS_FUNC_astore: {
+        break;
+    }
+    case PS_FUNC_OPEN_SQ: {
+        break;
+    }
+    case PS_FUNC_CLOSE_SQ: {
+        break;
+    }
+    case PS_FUNC_setpacking: {
+        break;
+    }
+    case PS_FUNC_currentpacking: {
+        break;
+    }
+    /*     Dictionary-specific */
+    case PS_FUNC_begin: {
+        break;
+    }
+    case PS_FUNC_end: {
+        break;
+    }
+    case PS_FUNC_def: {
+        break;
+    }
+    case PS_FUNC_store: {
+        break;
+    }
+    case PS_FUNC_load: {
+        break;
+    }
+    case PS_FUNC_where: {
+        break;
+    }
+    case PS_FUNC_countdictstack: {
+        break;
+    }
+    case PS_FUNC_cleardictstack: {
+        break;
+    }
+    case PS_FUNC_dictstack: {
+        break;
+    }
+    case PS_FUNC_known: {
+        break;
+    }
+    case PS_FUNC_maxlength: {
+        break;
+    }
+    case PS_FUNC_undef: {
+        break;
+    }
+    case PS_FUNC_left_arrow: {
+        break;
+    }
+    case PS_FUNC_right_arrow: {
+        break;
+    }
+    /*     String-specific */
+    case PS_FUNC_search: {
+        break;
+    }
+    case PS_FUNC_anchorsearch: {
+        break;
+    }
+    case PS_FUNC_token: {
+        break;
+    }
+    /* 3.6.4 Boolean */
+    case PS_FUNC_eq: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_ne: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_gt: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_ge: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_le: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_lt: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_and: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_or: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_xor: {
+        GET_2_MORE_TOKENS
+        break;
+    }
+    case PS_FUNC_true: {
+        break;
+    }
+    case PS_FUNC_false: {
+        break;
+    }
+    case PS_FUNC_not: {
+        break;
+    }
+    /* 3.6.5 Control */
+    case PS_FUNC_if: {
+        break;
+    }
+    case PS_FUNC_ifelse: {
+        break;
+    }
+    case PS_FUNC_exec: {
+        break;
+    }
+    case PS_FUNC_for: {
+        break;
+    }
+    case PS_FUNC_repeat: {
+        break;
+    }
+    case PS_FUNC_loop: {
+        break;
+    }
+    case PS_FUNC_forall: {
+        break;
+    }
+    case PS_FUNC_exit: {
+        break;
+    }
+    case PS_FUNC_countexecstack: {
+        break;
+    }
+    case PS_FUNC_execstack: {
+        break;
+    }
+    case PS_FUNC_stop: {
+        break;
+    }
+    /* 3.6.6 Type */
+    case PS_FUNC_type: {
+        break;
+    }
+    case PS_FUNC_xcheck: {
+        break;
+    }
+    case PS_FUNC_rcheck: {
+        break;
+    }
+    case PS_FUNC_wcheck: {
+        break;
+    }
+    case PS_FUNC_cvlit: {
+        break;
+    }
+    case PS_FUNC_cvx: {
+        break;
+    }
+    case PS_FUNC_readonly: {
+        break;
+    }
+    case PS_FUNC_executeonly: {
+        break;
+    }
+    case PS_FUNC_noaccess: {
+        break;
+    }
+    case PS_FUNC_cvi: {
+        break;
+    }
+    case PS_FUNC_cvr: {
+        break;
+    }
+    case PS_FUNC_cvn: {
+        break;
+    }
+    case PS_FUNC_cvs: {
+        break;
+    }
+    case PS_FUNC_cvrs: {
+        break;
+    }
+    /* 3.7.1 Memory */
+    case PS_FUNC_array: {
+        break;
+    }
+    case PS_FUNC_packedarray: {
+        break;
+    }
+    case PS_FUNC_dict: {
+        break;
+    }
+    case PS_FUNC_string: {
+        break;
+    }
+    case PS_FUNC_gstate:  {
+        break;
+    }
+    /* 3.7.2 VM */
+    case PS_FUNC_save:  {
+        break;
+    }
+    case PS_FUNC_restore:  {
+        break;
+    }
+    case PS_FUNC_gcheck:  {
+        break;
+    }
+    default: {
+        printf("ERROR: Postscript built-in %d not indexed.\n", element.i);
+        break;
+    }
     }
     return 0;
 }
