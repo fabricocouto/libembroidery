@@ -16,7 +16,7 @@ function build () {
 }
 
 function test_wrap () {
-    timeout $TEST_TIME $@ || echo "FAILED"
+    timeout $TEST_TIME $@ || echo "FAILED" && exit 1
 }
 
 function emb_test () {

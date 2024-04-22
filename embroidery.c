@@ -562,7 +562,8 @@ const EmbString flag_list[] = {
     "-f",
     "--simulate",
     "--combine",
-    "--cross-stitch"
+    "--cross-stitch",
+    "--ps"
 };
 
 const char *version_string = "embroider v0.1";
@@ -1318,6 +1319,13 @@ EmbBrand brand_codes[100] = {
  * Eventually we want all dependencies of libembroidery to be only c standard
  * libraries and we also need the interpreter to integrate well with our
  * own virtual machine. So this experiment is to establish that this works.
+ *
+ * I am using the PostScript Reference Manual for a description of how the
+ * langauge works. It is being held in an environment where it cannot
+ * effect the disk directly and can only edit a pattern loaded into memory.
+ * This should reduce the potential damage of a malicious postscript file,
+ * because it will only have access to the files that we explicitly give it
+ * access to (assuming there are no memory leaks).
  */
 
 /* PostScript data types */
@@ -1342,6 +1350,11 @@ static char postscript_data_type[][20] = {
 /* Attributes */
 #define LITERAL_ATTR                   0
 #define EXEC_ATTR                      1
+
+/* PostScript built-in identifiers */
+#define PS_FUNC_ADD                    0
+#define PS_FUNC_MUL                    1
+#define PS_FUNC_QUIT                   2
 
 typedef struct EmbStackElement_ {
     int data_type;
@@ -1385,7 +1398,7 @@ analyse_stack(EmbStack *stack)
         }
         printf(" ");
         if (element.attribute) {
-            printf("exec");
+            printf("exec index %d", element.i);
         }
         else {
             printf("literal");
@@ -1397,35 +1410,42 @@ analyse_stack(EmbStack *stack)
 /* .
  */
 int
-identify_token(EmbStackElement *element)
+stack_push(EmbStack *stack, char token[200])
 {
     int i, j;
     int all_digits = 1;
     int decimal_place_present = 0;
+    if (token[0] == 0) {
+        return;
+    }
+    string_copy(stack->stack[stack->position].s, token);
+    stack->position++;    
+    EmbStackElement *element = stack->stack + stack->position - 1;
     i = 0;
     j = 0;
     for (j=0; in_built_functions[j][0]; j++) {
-        if (string_equals(in_built_functions[j], element->s)) {
+        if (string_equals(in_built_functions[j], token)) {
             element->data_type = NAME_TYPE;
             element->attribute = EXEC_ATTR;
+            element->i = j;
             return NAME_TYPE;
         }
     }
 
     element->attribute = LITERAL_ATTR;
 
-    if (element->s[0] == '-') {
+    if (token[0] == '-') {
         i++;
     }
-    if (element->s[0] == '"') {
+    if (token[0] == '"') {
         element->data_type = STRING_TYPE;
         return STRING_TYPE;
     }
-    for (; element->s[i] && (i < 200); i++) {
-        if ((element->s[i] < '0') || (element->s[i] > '9')) {
+    for (; token[i] && (i < 200); i++) {
+        if ((token[i] < '0') || (token[i] > '9')) {
             all_digits = 0;
         }
-        if (element->s[i] == '.') {
+        if (token[i] == '.') {
             decimal_place_present++;
         }
     }
@@ -1439,29 +1459,43 @@ identify_token(EmbStackElement *element)
             return REAL_TYPE;
         }
         /* Multiple decimal points in one float error. */
+        stack->position--;
         return -2;
     }
     /* ERROR CODE */
+    stack->position--;
     return -1;
 }
 
 /* .
  */
-void
-append_token(EmbStack *stack, char token[200])
+EmbStackElement
+stack_pop(EmbStack *stack)
 {
-    if (token[0] == 0) {
-        return;
+    EmbStackElement e;
+    memcpy(&e, stack->stack + stack->position - 1, sizeof(EmbStackElement));
+    stack->position--;
+    return e;
+}
+
+/* .
+ */
+int
+queue_token(EmbStack *stack, char token[200])
+{
+    int error_code = stack_push(stack, token);
+    if (error_code < 0) {
+        printf("Failed to queue token %s\n", token);
+        return 0;
     }
-    string_copy(stack->stack[stack->position].s, token);
-    identify_token(stack->stack + stack->position);
-    stack->position++;    
+    process_stack_head(stack);
+    return 1;
 }
 
 /* .
  */
 void
-tokenize_line(EmbStack *stack, char line[200])
+queue_token_list(EmbStack *stack, char line[200])
 {
     char current_token[200];
     int i, j;
@@ -1469,7 +1503,7 @@ tokenize_line(EmbStack *stack, char line[200])
     for (i=0; line[i]; i++) {
         if (line[i] == ' ') {
             current_token[j] = 0;
-            append_token(stack, current_token);
+            queue_token(stack, current_token);
             j = 0;
         }
         else {
@@ -1479,8 +1513,64 @@ tokenize_line(EmbStack *stack, char line[200])
     }
     if (string_len(line) > 0) {
         current_token[j] = 0;
-        append_token(stack, current_token);
+        queue_token(stack, current_token);
     }
+}
+
+/* .
+ */
+int
+token_is_int(EmbStackElement arg)
+{
+    if (arg.attribute) {
+        return 0;
+    }
+    return (arg.data_type == INT_TYPE);
+}
+
+#define GET_2_MORE_TOKENS() \
+    if (stack->position < 2) { \
+        break; \
+    } \
+\
+    EmbStackElement arg1 = stack->stack[stack->position-2]; \
+    EmbStackElement arg2 = stack->stack[stack->position-3]; \
+    if (!token_is_int(arg1) || !token_is_int(arg2)) { \
+        break; \
+    } \
+\
+    char token[200]; \
+    stack_pop(stack); \
+    arg2 = stack_pop(stack); \
+    arg1 = stack_pop(stack);
+
+/* .
+ */
+int
+process_stack_head(EmbStack *stack)
+{
+    EmbStackElement element = stack->stack[stack->position-1];
+    if (element.attribute) {
+        switch (element.i) {
+        case PS_FUNC_ADD: {
+            GET_2_MORE_TOKENS();
+            sprintf(token, "%d", atoi(arg1.s) + atoi(arg2.s));
+            stack_push(stack, token);
+            break;
+        }
+        case PS_FUNC_MUL: {
+            GET_2_MORE_TOKENS();
+            sprintf(token, "%d", atoi(arg1.s) * atoi(arg2.s));
+            stack_push(stack, token);
+            break;
+        }
+        default: {
+            printf("ERROR: Postscript built-in %d not indexed.\n", element.i);
+            break;
+        }
+        }
+    }
+    return 0;
 }
 
 /* .
@@ -1488,7 +1578,7 @@ tokenize_line(EmbStack *stack, char line[200])
 void
 execute_postscript(EmbStack *stack, char line[200])
 {
-    tokenize_line(stack, line);
+    queue_token_list(stack, line);
     analyse_stack(stack);
 }
 
@@ -4444,7 +4534,7 @@ command_line_interface(int argc, char* argv[])
             }
 			return 0;
 		}
-        case FLAG_CROSS_STITCH:
+        case FLAG_CROSS_STITCH: {
             if (i + 3 < argc) {
                 EmbImage image;
                 /* the user appears to have entered the needed arguments */
@@ -4457,6 +4547,20 @@ command_line_interface(int argc, char* argv[])
                 i += 3;
             }
             break;
+        }
+        case FLAG_POSTSCRIPT: {
+            EmbStack stack;
+            stack.position = 0;
+            int j;
+            char command[200];
+            command[0] = 0;
+            for (j=i+1; j<argc; j++) {
+                strcat(command, argv[j]);
+                strcat(command, " ");
+            }
+            execute_postscript(&stack, command);
+            break;
+        }
         default:
             flags--;
             break;

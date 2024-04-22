@@ -354,7 +354,8 @@ extern "C" {
 #define FLAG_SIMULATE                 35
 #define FLAG_COMBINE                  36
 #define FLAG_CROSS_STITCH             37
-#define NUM_FLAGS                     38
+#define FLAG_POSTSCRIPT               38
+#define NUM_FLAGS                     39
 
 /* LANGUAGES */
 #define LANG_SVG                       0
