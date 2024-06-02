@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <inttypes.h>
 
 void *
 emb_fopen(const char *fname, const char *mode)
@@ -223,13 +224,13 @@ int check_header_present(void* file, int minimum_header_length);
 unsigned short fread_uint16(void *file);
 short fread_int16(void* f);
 
-void binaryWriteUIntBE(void* f, unsigned int data);
-void binaryWriteUInt(void* f, unsigned int data);
+void emb_write_u32be(void* f, unsigned int data);
+void emb_write_u32(void* f, unsigned int data);
 void binaryWriteIntBE(void* f, int data);
 void binaryWriteInt(void* f, int data);
 void binaryWriteUShort(void* f, unsigned short data);
 void binaryWriteUShortBE(void* f, unsigned short data);
-void binaryWriteShort(void* f, short data);
+void emb_write_i16(void* f, int16_t data);
 
 bcf_file_difat* bcf_difat_create(void* file, unsigned int fatSectors, const unsigned int sectorSize);
 unsigned int readFullSector(void* file, bcf_file_difat* bcfFile, unsigned int* numberOfDifatEntriesStillToRead);
@@ -6476,17 +6477,25 @@ fpad(void* file, char c, int n)
 /* \todo replace with embInt_read
  */
 void
-binaryWriteShort(void* f, short data)
+emb_write_i16(void* f, int16_t data)
 {
-    emb_write(f, &data, EMB_INT16_LITTLE);
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 2);
+#endif
+    emb_fwrite(b, 2, f);
 }
 
 /* \todo replace with embInt_read
  */
 void
-binaryWriteUShort(void* f, unsigned short data)
+binaryWriteUShort(void* f, uint16_t data)
 {
-    emb_write(f, &data, EMB_INT16_LITTLE);
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 2);
+#endif
+    emb_fwrite(b, 2, f);
 }
 
 /* \todo replace with embInt_read
@@ -6516,7 +6525,7 @@ binaryWriteIntBE(void* f, int data)
 /* \todo replace with embInt_read
  */
 void
-binaryWriteUInt(void* f, unsigned int data)
+emb_write_u32(void* f, unsigned int data)
 {
     emb_write(f, &data, EMB_INT32_LITTLE);
 }
@@ -6524,7 +6533,7 @@ binaryWriteUInt(void* f, unsigned int data)
 /* \todo replace with embInt_read
  */
 void
-binaryWriteUIntBE(void* f, unsigned int data)
+emb_write_u32be(void* f, unsigned int data)
 {
     emb_write(f, &data, EMB_INT32_BIG);
 }
@@ -9437,10 +9446,10 @@ writeHus(EmbPattern* pattern, void* file)
     emb_write(file, &minColors, EMB_INT32_LITTLE);
 
     boundingRect = emb_pattern_calcBoundingBox(pattern);
-    right = (short) emb_round(boundingRect.right * 10.0);
-    top = (short) -emb_round(boundingRect.top * 10.0);
-    left = (short) emb_round(boundingRect.left * 10.0);
-    bottom = (short) -emb_round(boundingRect.bottom * 10.0);
+    right = (int16_t) emb_round(boundingRect.right * 10.0);
+    top = (int16_t) -emb_round(boundingRect.top * 10.0);
+    left = (int16_t) emb_round(boundingRect.left * 10.0);
+    bottom = (int16_t) -emb_round(boundingRect.bottom * 10.0);
     emb_write(file, &right, EMB_INT16_LITTLE);
     emb_write(file, &top, EMB_INT16_LITTLE);
     emb_write(file, &left, EMB_INT16_LITTLE);
@@ -9488,7 +9497,7 @@ writeHus(EmbPattern* pattern, void* file)
     fpad(file, 0, 10);
 
     for (i = 0; i < patternColor; i++) {
-        short color_index = (short)emb_find_nearest_thread(pattern->thread_list->thread[i].color, (EmbThread*)husThreads, 29);
+        short color_index = (int16_t)emb_find_nearest_thread(pattern->thread_list->thread[i].color, (EmbThread*)husThreads, 29);
         emb_write(file, &color_index, EMB_INT16_LITTLE);
     }
 
@@ -9621,11 +9630,11 @@ writeInf(EmbPattern* pattern, void* file)
 {
     int i, bytesRemaining;
 
-    binaryWriteUIntBE(file, 0x01);
-    binaryWriteUIntBE(file, 0x08);
+    emb_write_u32be(file, 0x01);
+    emb_write_u32be(file, 0x08);
     /* write place holder offset */
-    binaryWriteUIntBE(file, 0x00);
-    binaryWriteUIntBE(file, pattern->thread_list->count);
+    emb_write_u32be(file, 0x00);
+    emb_write_u32be(file, pattern->thread_list->count);
 
     for (i = 0; i < pattern->thread_list->count; i++) {
         EmbString buffer;
@@ -9650,7 +9659,7 @@ writeInf(EmbPattern* pattern, void* file)
     emb_fseek(file, -8, SEEK_END);
     bytesRemaining = ftell(file);
     emb_fseek(file, 8, SEEK_SET);
-    binaryWriteUIntBE(file, bytesRemaining);
+    emb_write_u32be(file, bytesRemaining);
     return 1;
 }
 
@@ -10364,7 +10373,7 @@ ofmReadThreads(void* file, EmbPattern* p)
 
 EmbReal ofmDecode(unsigned char b1, unsigned char b2)
 {
-    EmbReal val = (EmbReal)(short)(b1 << 8 | b2);
+    EmbReal val = (EmbReal)(int16_t)(b1 << 8 | b2);
     return val;
 }
 
@@ -11547,11 +11556,11 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
         blockCount++;
     }
 
-    binaryWriteShort(file, (short)blockCount); /* block count */
+    emb_write_i16(file, (int16_t)blockCount); /* block count */
     binaryWriteUShort(file, 0xFFFF);
-    binaryWriteShort(file, 0x00);
+    emb_write_i16(file, 0x00);
 
-    binaryWriteShort(file, 0x07); /* string length */
+    emb_write_i16(file, 0x07); /* string length */
     emb_fwrite("CSewSeg", 7, file);
 
     if (colorCount > 1000) {
@@ -11559,7 +11568,7 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
         colorCount = 1000;
     }
 
-    colorInfo = (short *) calloc(colorCount * 2, sizeof(short));
+    colorInfo = (short *) calloc(colorCount * 2, sizeof(int16_t));
     colorCode = -1;
     blockCount = 0;
     for (i = 0; i < pattern->stitch_list->count; i++) {
@@ -11575,8 +11584,8 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
                 puts("Ran out of memory for color info.");
                 break;
             }
-            colorInfo[colorInfoIndex++] = (short)blockCount;
-            colorInfo[colorInfoIndex++] = (short)newColorCode;
+            colorInfo[colorInfoIndex++] = (int16_t)blockCount;
+            colorInfo[colorInfoIndex++] = (int16_t)newColorCode;
             colorCode = newColorCode;
         }
         count = 0;
@@ -11592,14 +11601,14 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
             stitchType = 0;
         }
 
-        binaryWriteShort(file, (short)stitchType); /* 1 for jump, 0 for normal */
-        binaryWriteShort(file, (short)colorCode); /* color code */
-        binaryWriteShort(file, (short)count); /* stitches in block */
+        emb_write_i16(file, (int16_t)stitchType); /* 1 for jump, 0 for normal */
+        emb_write_i16(file, (int16_t)colorCode); /* color code */
+        emb_write_i16(file, (int16_t)count); /* stitches in block */
         j = i;
         while (j < pattern->stitch_list->count && (flag == st.flags)) {
             st = pattern->stitch_list->stitch[j];
-            binaryWriteShort(file, (short)(st.x - bounds.left));
-            binaryWriteShort(file, (short)(st.y + bounds.top));
+            emb_write_i16(file, (int16_t)(st.x - bounds.left));
+            emb_write_i16(file, (int16_t)(st.y + bounds.top));
         }
         if (j < pattern->stitch_list->count ) {
             binaryWriteUShort(file, 0x8003);
@@ -11607,10 +11616,10 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
         blockCount++;
         i = j;
     }
-    binaryWriteShort(file, (short)colorCount);
+    emb_write_i16(file, (int16_t)colorCount);
     for (i = 0; i < colorCount; i++) {
-        binaryWriteShort(file, colorInfo[i * 2]);
-        binaryWriteShort(file, colorInfo[i * 2 + 1]);
+        emb_write_i16(file, colorInfo[i * 2]);
+        emb_write_i16(file, colorInfo[i * 2 + 1]);
     }
     binaryWriteInt(file, 0);
     safe_free(colorInfo);
@@ -11622,7 +11631,7 @@ pesWriteEmbOneSection(EmbPattern* pattern, void* file) {
     float x, width, height;
     int hoopHeight = 1800, hoopWidth = 1300;
     EmbRect bounds;
-    binaryWriteShort(file, 0x07); /* string length */
+    emb_write_i16(file, 0x07); /* string length */
     emb_fwrite("CEmbOne", 7, file);
     bounds = emb_pattern_calcBoundingBox(pattern);
 
@@ -11644,11 +11653,11 @@ pesWriteEmbOneSection(EmbPattern* pattern, void* file) {
     x = (float)((height + hoopHeight) / 2);
     emb_write(file, &x, EMB_INT32_LITTLE);
 
-    binaryWriteShort(file, 1);
-    binaryWriteShort(file, 0); /* Translate X */
-    binaryWriteShort(file, 0); /* Translate Y */
-    binaryWriteShort(file, (short)width);
-    binaryWriteShort(file, (short)height);
+    emb_write_i16(file, 1);
+    emb_write_i16(file, 0); /* Translate X */
+    emb_write_i16(file, 0); /* Translate Y */
+    emb_write_i16(file, (int16_t)width);
+    emb_write_i16(file, (int16_t)height);
 
     fpad(file, 0, 8);
     /*WriteSubObjects(br, pes, SubBlocks); */
@@ -11664,13 +11673,13 @@ writePes(EmbPattern* pattern,  const char *fileName, void* file)
     /* WRITE PECPointer 32 bit int */
     binaryWriteInt(file, 0x00);
 
-    binaryWriteShort(file, 0x01);
-    binaryWriteShort(file, 0x01);
+    emb_write_i16(file, 0x01);
+    emb_write_i16(file, 0x01);
 
     /* Write object count */
-    binaryWriteShort(file, 0x01);
+    emb_write_i16(file, 0x01);
     binaryWriteUShort(file, 0xFFFF); /* command */
-    binaryWriteShort(file, 0x00); /* unknown */
+    emb_write_i16(file, 0x00); /* unknown */
 
     pesWriteEmbOneSection(pattern, file);
     pesWriteSewSegSection(pattern, file);
@@ -11721,7 +11730,7 @@ readPhb(EmbPattern* pattern, void* file)
 
     emb_fseek(file, fileOffset + 14, SEEK_SET); /* 28 */
 
-    colorCount = (short)(char)fgetc(file);
+    colorCount = (int16_t)(char)fgetc(file);
     for (i = 0; i <  colorCount; i++) {
         char stor;
         stor = (char)fgetc(file);
@@ -11978,7 +11987,7 @@ writeSew(EmbPattern* pattern, void* file)
 {
     int i;
     EmbReal xx = 0.0, yy = 0.0;
-    binaryWriteShort(file, pattern->thread_list->count);
+    emb_write_i16(file, pattern->thread_list->count);
 
     if (emb_verbose>1) {
         printf("Debugging Information\n");
@@ -11991,7 +12000,7 @@ writeSew(EmbPattern* pattern, void* file)
         EmbColor col;
         col = pattern->thread_list->thread[i].color;
         thr = emb_find_nearest_thread(col, (EmbThread *)jefThreads, 79);
-        binaryWriteShort(file, thr);
+        emb_write_i16(file, thr);
     }
     fpad(file, 0, 0x1D78 - 2 - pattern->thread_list->count * 2);
 
@@ -12047,9 +12056,9 @@ shvDecode(unsigned char inputByte)
 short shvDecodeShort(unsigned short inputByte)
 {
     if (inputByte > 0x8000) {
-        return (short)-((unsigned short)((~inputByte) + 1));
+        return (int16_t)-((unsigned short)((~inputByte) + 1));
     }
-    return ((short)inputByte);
+    return ((int16_t)inputByte);
 }
 
 char
@@ -13926,8 +13935,8 @@ writeThr(EmbPattern* pattern, void* file)
     header.numStiches = (unsigned short)stitchCount; /* number of stitches in design */
     header.hoopSize = 5;
 
-    binaryWriteUInt(file, header.sigVersion);
-    binaryWriteUInt(file, header.length);
+    emb_write_u32(file, header.sigVersion);
+    emb_write_u32(file, header.length);
     binaryWriteUShort(file, header.numStiches);
     binaryWriteUShort(file, header.hoopSize);
     for (i=0; i<7; i++) {
@@ -13958,7 +13967,7 @@ writeThr(EmbPattern* pattern, void* file)
         y = (float)(st.y * 10.0);
         emb_write(file, &x, EMB_INT32_LITTLE);
         emb_write(file, &y, EMB_INT32_LITTLE);
-        binaryWriteUInt(file, NOTFRM | (st.color & 0x0F));
+        emb_write_u32(file, NOTFRM | (st.color & 0x0F));
     }
     emb_fwrite(bitmapName, 16, file);
     /* background color */
@@ -14413,17 +14422,17 @@ writeVip(EmbPattern* pattern, void* file)
     if (minColors > 24) {
         minColors = 24;
     }
-    binaryWriteUInt(file, 0x0190FC5D);
-    binaryWriteUInt(file, stitchCount);
-    binaryWriteUInt(file, minColors);
+    emb_write_u32(file, 0x0190FC5D);
+    emb_write_u32(file, stitchCount);
+    emb_write_u32(file, minColors);
 
     boundingRect = emb_pattern_calcBoundingBox(pattern);
-    binaryWriteShort(file, (short) emb_round(boundingRect.right * 10.0));
-    binaryWriteShort(file, (short) -emb_round(boundingRect.top * 10.0 - 1.0));
-    binaryWriteShort(file, (short) emb_round(boundingRect.left * 10.0));
-    binaryWriteShort(file, (short) -emb_round(boundingRect.bottom * 10.0 - 1.0));
+    emb_write_i16(file, (int16_t) emb_round(boundingRect.right * 10.0));
+    emb_write_i16(file, (int16_t) -emb_round(boundingRect.top * 10.0 - 1.0));
+    emb_write_i16(file, (int16_t) emb_round(boundingRect.left * 10.0));
+    emb_write_i16(file, (int16_t) -emb_round(boundingRect.bottom * 10.0 - 1.0));
 
-    binaryWriteUInt(file, 0x38 + (minColors << 3));
+    emb_write_u32(file, 0x38 + (minColors << 3));
 
     xValues = (unsigned char*)malloc(sizeof(unsigned char)*(stitchCount));
     yValues = (unsigned char*)malloc(sizeof(unsigned char)*(stitchCount));
@@ -14445,10 +14454,10 @@ writeVip(EmbPattern* pattern, void* file)
         xCompressed = vipCompressData(xValues, stitchCount, &xCompressedSize);
         yCompressed = vipCompressData(yValues, stitchCount, &yCompressedSize);
 
-        binaryWriteUInt(file, (unsigned int) (0x38 + (minColors << 3) + attributeSize));
-        binaryWriteUInt(file, (unsigned int) (0x38 + (minColors << 3) + attributeSize + xCompressedSize));
-        binaryWriteUInt(file, 0x00000000);
-        binaryWriteUInt(file, 0x00000000);
+        emb_write_u32(file, (unsigned int) (0x38 + (minColors << 3) + attributeSize));
+        emb_write_u32(file, (unsigned int) (0x38 + (minColors << 3) + attributeSize + xCompressedSize));
+        emb_write_u32(file, 0x00000000);
+        emb_write_u32(file, 0x00000000);
         binaryWriteUShort(file, 0x0000);
 
         binaryWriteInt(file, minColors << 2);
@@ -14470,8 +14479,8 @@ writeVip(EmbPattern* pattern, void* file)
         for (i = 0; i <= minColors; i++) {
             binaryWriteInt(file, 1);
         }
-        binaryWriteUInt(file, 0); /* string length */
-        binaryWriteShort(file, 0);
+        emb_write_u32(file, 0); /* string length */
+        emb_write_i16(file, 0);
         emb_fwrite((char*) attributeCompressed, attributeSize, file);
         emb_fwrite((char*) xCompressed, xCompressedSize, file);
         emb_fwrite((char*) yCompressed, yCompressedSize, file);
@@ -14527,9 +14536,9 @@ short
 vp3DecodeInt16(unsigned short inputByte)
 {
     if (inputByte > 0x8000) {
-        return -((short) ((~inputByte) + 1));
+        return -((int16_t) ((~inputByte) + 1));
     }
-    return ((short)inputByte);
+    return ((int16_t)inputByte);
 }
 
 vp3Hoop
@@ -15011,7 +15020,7 @@ readXxx(EmbPattern* pattern, void* file)
         /* TODO: ARE THERE OTHER BIG JUMP CODES? */
         if (b0 == 0x7E || b0 == 0x7D) {
             dx = b1 + ((char)fgetc(file) << 8);
-            dx = ((short) dx);
+            dx = ((int16_t) dx);
             dy = fread_int16(file);
             flags = TRIM;
         } else if (b0 == 0x7F) {
@@ -15053,8 +15062,8 @@ xxxEncodeStitch(void* file, EmbReal deltaX, EmbReal deltaY, int flags)
     if ((flags & (JUMP | TRIM)) && (fabs(deltaX) > 124 || fabs(deltaY) > 124)) {
         fputc(0x7E, file);
         /* Does this cast work right? */
-        binaryWriteShort(file, (short)deltaX);
-        binaryWriteShort(file, (short)deltaY);
+        emb_write_i16(file, (int16_t)deltaX);
+        emb_write_i16(file, (int16_t)deltaY);
     } else {
         /* TODO: Verify this works after changing this to unsigned char */
         fputc((unsigned char)emb_round(deltaX), file);
@@ -15117,23 +15126,17 @@ writeXxx(EmbPattern* pattern, void* file)
     rect = emb_pattern_calcBoundingBox(pattern);
     width = rect.right - rect.left;
     height = rect.bottom - rect.top;
-    to_write = (short)(width * 10.0);
-    emb_write(file, &to_write, EMB_INT16_LITTLE);
-    to_write = (short)(height * 10.0);
-    emb_write(file, &to_write, EMB_INT16_LITTLE);
+    emb_write_i16(file, (int16_t)(width * 10.0));
+    emb_write_i16(file, (int16_t)(height * 10.0));
 
-    /*TODO: xEnd from start point x=0 */
-    to_write = (short)(width / 2.0 * 10);
-    emb_write(file, &to_write, EMB_INT16_LITTLE);
-    /*TODO: yEnd from start point y=0 */
-    to_write = (short)(height / 2.0 * 10);
-    emb_write(file, &to_write, EMB_INT16_LITTLE);
-    /*TODO: left from start x = 0     */
-    to_write = (short)(width / 2.0 * 10);
-    emb_write(file, &to_write, EMB_INT16_LITTLE);
-    /*TODO: bottom from start y = 0   */
-    to_write = (short)(height / 2.0 * 10);
-    emb_write(file, &to_write, EMB_INT16_LITTLE);
+    /* TODO: xEnd from start point x=0 */
+    emb_write_i16(file, (int16_t)(width / 2.0 * 10));
+    /* TODO: yEnd from start point y=0 */
+    emb_write_i16(file, (int16_t)(height / 2.0 * 10));
+    /* TODO: left from start x = 0 */
+    emb_write_i16(file, (int16_t)(width / 2.0 * 10));
+    /* TODO: bottom from start y = 0 */
+    emb_write_i16(file, (int16_t)(height / 2.0 * 10));
 
     fpad(file, 0, 0xC5);
 
@@ -15142,7 +15145,7 @@ writeXxx(EmbPattern* pattern, void* file)
     xxxEncodeDesign(file, pattern);
     endOfStitches = ftell(file);
     emb_fseek(file, 0xFC, SEEK_SET);
-    binaryWriteUInt(file, endOfStitches);
+    emb_write_u32(file, endOfStitches);
     emb_fseek(file, 0, SEEK_END);
     /* is this really correct? */
     emb_fwrite("\x7F\x7F\x03\x14\x00\x00", 6, file);
@@ -15153,8 +15156,7 @@ writeXxx(EmbPattern* pattern, void* file)
         embColor_write(file, c, 3);
     }
     for (i = 0; i < (22 - pattern->thread_list->count); i++) {
-        unsigned int padder = 0x01000000;
-        emb_write(file, &padder, EMB_INT32_LITTLE);
+        emb_write_u32(file, 0x01000000);
     }
     emb_fwrite("\x00\x01", 2, file);
     return 1;
@@ -15414,64 +15416,6 @@ embGeometry_boundingRect(EmbGeometry *obj)
     return path().boundingRect();
     */
     return r;
-}
-
-/* Toggle the rubber mode of the object.
- *
- * \todo Review. This could be controlled by a simple flag.
- */
-void
-emb_vulcanize(EmbGeometry *obj)
-{
-    switch (obj->type) {
-    case EMB_ARC:
-    case EMB_CIRCLE:
-    case EMB_DIM_LEADER:
-    case EMB_ELLIPSE:
-    case EMB_IMAGE:
-    case EMB_LINE:
-    case EMB_POINT:
-    case EMB_RECT:
-    case EMB_TEXT_SINGLE:
-        /*
-        updateRubber();
-
-        setRubberMode(OBJ_RUBBER_OFF);
-        */
-        break;
-    default:
-        break;
-    }
-    if (obj->type == EMB_PATH) {
-        /*
-        updateRubber();
-
-        setRubberMode(OBJ_RUBBER_OFF);
-
-        if (!normalPath.elementCount())
-            critical_messagebox(0, translate("Empty Path Error"), translate("The path added contains no points. The command that created this object has flawed logic."));
-        */
-    }
-    if (obj->type == EMB_POLYGON) {
-        /*
-        updateRubber();
-
-        setRubberMode(OBJ_RUBBER_OFF);
-
-        if (!normalPath.elementCount())
-            critical_messagebox(0, translate("Empty Polygon Error"), translate("The polygon added contains no points. The command that created this object has flawed logic."));
-        */
-    }
-    if (obj->type == EMB_POLYLINE) {
-        /*
-        updateRubber();
-
-        setRubberMode(OBJ_RUBBER_OFF);
-
-        if (!normalPath.elementCount())
-            critical_messagebox(0, translate("Empty embPolyline Error"), translate("The embPolyline added contains no points. The command that created this object has flawed logic."));
-        */
-    }
 }
 
 /*
@@ -15741,7 +15685,7 @@ emb_arc_includedAngle(EmbArc arc)
 {
     printf("%f", arc.start.x);
     /*
-    float chord = objectChord();
+    float chord = get_real(gdata, EMB_REAL_CHORD);
     float rad = objectRadius();
     if (chord <= 0 || rad <= 0) return 0; //Prevents division by zero and non-existant circles
 
@@ -15759,40 +15703,6 @@ emb_arc_includedAngle(EmbArc arc)
     // Properties of a Circle - Get the Included Angle - Reference: ASD9
     */
     return 0.0;
-}
-
-char Arc_clockwise()
-{
-    /*
-    // NOTE: Y values are inverted here on purpose
-    EmbArc arc2 = arc;
-    arc2.start.y *= -1.0;
-    arc2.mid.y *= -1.0;
-    arc2.end.y *= -1.0;
-
-    return emb_arc_clockwise(arc2);
-    */
-    return 0;
-}
-
-void emb_arc_updatePath(EmbArc arc)
-{
-    printf("%f", arc.start.x);
-    /*
-    float startAngle = (objectStartAngle() + rotation());
-    float spanAngle = objectIncludedAngle();
-
-    if (objectClockwise()) {
-        spanAngle = -spanAngle;
-    }
-
-    QPainterPath path;
-    path.arcMoveTo(rect(), startAngle);
-    path.arcTo(rect(), startAngle, spanAngle);
-    //NOTE: Reverse the path so that the inside area isn't considered part of the arc
-    path.arcTo(rect(), startAngle+spanAngle, -spanAngle);
-    setPath(path);
-    */
 }
 
 void emb_arc_paint(void)
@@ -15819,57 +15729,6 @@ void emb_arc_paint(void)
     EmbRect paintRect(-rad, -rad, rad*2.0, rad*2.0);
     painter->drawArc(paintRect, startAngle, spanAngle);
     */
-}
-
-void emb_arc_updateRubber(EmbArc arc, int pattern, int layer, int index)
-{
-    //TODO: Arc Rubber Modes
-
-    //TODO: updateRubber() gripping for ArcObject
-
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector emb_arc_mouseSnapPoint(EmbArc arc, EmbVector mousePoint)
-{
-    printf("%f", arc.start.x);
-    printf("%f", mousePoint.x);
-    /*
-    EmbVector center = objectCenter();
-    EmbVector start  = objectStartPoint();
-    EmbVector mid    = objectMidPoint();
-    EmbVector end    = objectEndPoint();
-
-    float cntrDist  = EmbLine(mousePoint, center).length();
-    float startDist = EmbLine(mousePoint, start).length();
-    float midDist   = EmbLine(mousePoint, mid).length();
-    float endDist   = EmbLine(mousePoint, end).length();
-
-    float minDist = std::min(std::min(cntrDist, startDist), std::min(midDist, endDist));
-
-    if     (minDist == cntrDist)  return center;
-    else if (minDist == startDist) return start;
-    else if (minDist == midDist)   return mid;
-    else if (minDist == endDist)   return end;
-
-    return scenePos();
-    */
-    return mousePoint;
-}
-
-/*
-std::vector<EmbVector> emb_arc_allGripPoints(EmbArc arc)
-{
-    EmbVector center = emb_arc_center(arc);
-    std::vector<EmbVector> gripPoints = {center, arc.start, arc.mid, arc.end};
-    return gripPoints;
-}
-*/
-
-void emb_arc_gripEdit(EmbArc *arc, EmbVector before, EmbVector after)
-{
-    printf("%f %f %f", arc->start.x, before.x, after.x);
-    // TODO: gripEdit() for ArcObject
 }
 
 void set_object_color(EmbGeometry *obj, EmbColor color)
@@ -16255,20 +16114,6 @@ void emb_circle_setCircumference(EmbCircle *circle, float circumference)
 }
 
 /*
-void emb_circle_updatePath()
-{
-    QPainterPath path;
-    EmbRect r = rect();
-    //Add the center point
-    path.addRect(-0.00000001, -0.00000001, 0.00000002, 0.00000002);
-    //Add the circle
-    path.arcMoveTo(r, 0);
-    path.arcTo(r, 0, 360);
-    //NOTE: Reverse the path so that the inside area isn't considered part of the circle
-    path.arcTo(r, 0, -360);
-    setPath(path);
-}
-
 void emb_circle_paint(QPainter* painter)
 {
     QGraphicsScene* objScene = scene();
@@ -16284,134 +16129,6 @@ void emb_circle_paint(QPainter* painter)
     painter->drawEllipse(rect());
 }
 
-void emb_circle_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_CIRCLE_1P_RAD) {
-        EmbVector sceneCenterPoint = objectRubberPoint("CIRCLE_CENTER");
-        EmbVector sceneQSnapPoint = objectRubberPoint("CIRCLE_RADIUS");
-        EmbVector itemCenterPoint = mapFromScene(sceneCenterPoint);
-        EmbVector itemQSnapPoint = mapFromScene(sceneQSnapPoint);
-        EmbLine itemLine(itemCenterPoint, itemQSnapPoint);
-        setCenter(sceneCenterPoint);
-        EmbLine sceneLine(sceneCenterPoint, sceneQSnapPoint);
-        float radius = sceneLine.length();
-        setRadius(radius);
-        if (painter) drawRubberLine(itemLine, painter, VIEW_COLOR_CROSSHAIR);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_CIRCLE_1P_DIA) {
-        EmbVector sceneCenterPoint = objectRubberPoint("CIRCLE_CENTER");
-        EmbVector sceneQSnapPoint = objectRubberPoint("CIRCLE_DIAMETER");
-        EmbVector itemCenterPoint = mapFromScene(sceneCenterPoint);
-        EmbVector itemQSnapPoint = mapFromScene(sceneQSnapPoint);
-        EmbLine itemLine(itemCenterPoint, itemQSnapPoint);
-        setCenter(sceneCenterPoint);
-        EmbLine sceneLine(sceneCenterPoint, sceneQSnapPoint);
-        float diameter = sceneLine.length();
-        setDiameter(diameter);
-        if (painter) drawRubberLine(itemLine, painter, VIEW_COLOR_CROSSHAIR);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_CIRCLE_2P) {
-        EmbVector sceneTan1Point = objectRubberPoint("CIRCLE_TAN1");
-        EmbVector sceneQSnapPoint = objectRubberPoint("CIRCLE_TAN2");
-        EmbLine sceneLine(sceneTan1Point, sceneQSnapPoint);
-        setCenter(sceneLine.pointAt(0.5));
-        float diameter = sceneLine.length();
-        setDiameter(diameter);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_CIRCLE_3P) {
-        EmbVector sceneTan1Point = objectRubberPoint("CIRCLE_TAN1");
-        EmbVector sceneTan2Point = objectRubberPoint("CIRCLE_TAN2");
-        EmbVector sceneTan3Point = objectRubberPoint("CIRCLE_TAN3");
-
-        float sceneCenterX;
-        float sceneCenterY;
-        EmbArc arc;
-        EmbVector sceneCenter;
-        arc.start.x = sceneTan1Point.x();
-        arc.start.y = sceneTan1Point.y();
-        arc.mid.x = sceneTan2Point.x();
-        arc.mid.y = sceneTan2Point.y();
-        arc.end.x = sceneTan3Point.x();
-        arc.end.y = sceneTan3Point.y();
-        emb_arc_center(arc, &sceneCenter);
-        EmbVector sceneCenterPoint(sceneCenter.x, sceneCenter.y);
-        EmbLine sceneLine(sceneCenterPoint, sceneTan3Point);
-        setCenter(sceneCenterPoint);
-        float radius = sceneLine.length();
-        setRadius(radius);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if (gripPoint == objectCenter()) {
-                painter->drawEllipse(rect().translated(mapFromScene(objectRubberPoint(std::string()))-mapFromScene(gripPoint)));
-            }
-            else {
-                float gripRadius = EmbLine(objectCenter(), objectRubberPoint(std::string())).length();
-                painter->drawEllipse(EmbVector(), gripRadius, gripRadius);
-            }
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-        }
-    }
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector Circle_mouseSnapPoint(EmbVector& mousePoint)
-{
-    EmbVector center  = objectCenter();
-    EmbVector quad0   = objectQuadrant0();
-    EmbVector quad90  = objectQuadrant90();
-    EmbVector quad180 = objectQuadrant180();
-    EmbVector quad270 = objectQuadrant270();
-
-    float cntrDist = EmbLine(mousePoint, center).length();
-    float q0Dist   = EmbLine(mousePoint, quad0).length();
-    float q90Dist  = EmbLine(mousePoint, quad90).length();
-    float q180Dist = EmbLine(mousePoint, quad180).length();
-    float q270Dist = EmbLine(mousePoint, quad270).length();
-
-    float minDist = std::min(std::min(std::min(q0Dist, q90Dist), std::min(q180Dist, q270Dist)), cntrDist);
-
-    if     (minDist == cntrDist) return center;
-    else if (minDist == q0Dist)   return quad0;
-    else if (minDist == q90Dist)  return quad90;
-    else if (minDist == q180Dist) return quad180;
-    else if (minDist == q270Dist) return quad270;
-
-    return scenePos();
-}
-*/
-
-/*
-std::vector<EmbVector> Circle_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << objectCenter() << objectQuadrant0() << objectQuadrant90() << objectQuadrant180() << objectQuadrant270();
-    return gripPoints;
-}
-*/
-
-/*
-void emb_circle_gripEdit(EmbVector& before, EmbVector& after)
-{
-    if (before == objectCenter()) {
-        EmbVector delta = after-before;
-        moveBy(delta.x(), delta.y());
-    }
-    else {
-        setRadius(EmbLine(objectCenter(), after).length());
-    }
-}
-*/
-
-/*
 QPainterPath Circle_objectSavePath()
 {
     QPainterPath path;
@@ -16425,9 +16142,7 @@ QPainterPath Circle_objectSavePath()
     trans.scale(s,s);
     return trans.map(path);
 }
-*/
 
-/*
 void dim_leader_init(EmbLine line, unsigned int rgb, int lineType)
 {
     setData(OBJ_TYPE, type);
@@ -16444,9 +16159,7 @@ void dim_leader_init(EmbLine line, unsigned int rgb, int lineType)
     setLineWeight(0.35); //TODO: pass in proper lineweight
     setPen(objPen);
 }
-*/
 
-/*
 void dimleader_setEndPoint1(EmbVector endPt1)
 {
     EmbVector delta;
@@ -16457,9 +16170,7 @@ void dimleader_setEndPoint1(EmbVector endPt1)
     setPos(endPt1);
     updateLeader();
 }
-*/
 
-/*
 void dimleader_setEndPoint2(EmbVector endPt2)
 {
     EmbVector delta;
@@ -16470,16 +16181,12 @@ void dimleader_setEndPoint2(EmbVector endPt2)
     setPos(endPt1);
     updateLeader();
 }
-*/
 
-/*
 EmbVector dimleader_objectEndPoint1()
 {
     return scenePos();
 }
-*/
 
-/*
 EmbVector dimleader_objectEndPoint2()
 {
     EmbLine lyne = line();
@@ -16611,78 +16318,6 @@ void dimleader_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, 
 
     if (filled) {
         painter->fillPath(arrowStylePath, objectColor());
-    }
-}
-
-void dimleader_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_DIMLEADER_LINE) {
-        EmbVector sceneStartPoint = objectRubberPoint("DIMLEADER_LINE_START");
-        EmbVector sceneQSnapPoint = objectRubberPoint("DIMLEADER_LINE_END");
-
-        setEndPoint1(sceneStartPoint);
-        setEndPoint2(sceneQSnapPoint);
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if (gripPoint == objectEndPoint1())
-                painter->drawLine(line().p2(), mapFromScene(objectRubberPoint(std::string())));
-            else if (gripPoint == objectEndPoint2())
-                painter->drawLine(line().p1(), mapFromScene(objectRubberPoint(std::string())));
-            else if (gripPoint == objectMidPoint())
-                painter->drawLine(line().translated(mapFromScene(objectRubberPoint(std::string()))-mapFromScene(gripPoint)));
-        }
-    }
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector dimleader_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    EmbVector endPoint1 = objectEndPoint1();
-    EmbVector endPoint2 = objectEndPoint2();
-    EmbVector midPoint  = objectMidPoint();
-
-    float end1Dist = EmbLine(mousePoint, endPoint1).length();
-    float end2Dist = EmbLine(mousePoint, endPoint2).length();
-    float midDist  = EmbLine(mousePoint, midPoint).length();
-
-    float minDist = std::min(end1Dist, end2Dist);
-
-    if (curved)
-        minDist = std::min(minDist, midDist);
-
-    if     (minDist == end1Dist) return endPoint1;
-    else if (minDist == end2Dist) return endPoint2;
-    else if (minDist == midDist)  return midPoint;
-
-    return scenePos();
-}
-
-std::vector<EmbVector> embDimLeader_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << objectEndPoint1() << objectEndPoint2();
-    if (curved) {
-        gripPoints << objectMidPoint();
-    }
-    return gripPoints;
-}
-*/
-
-/*
-void embDimLeader_gripEdit(const EmbVector before, const EmbVector after)
-{
-    if (before == objectEndPoint1()) {
-        setEndPoint1(after);
-    }
-    else if (before == objectEndPoint2()) {
-        setEndPoint2(after);
-    }
-    else if (before == objectMidPoint()) {
-        EmbVector delta = emb_vector_subtract(after, before);
-        moveBy(delta);
     }
 }
 */
@@ -16951,18 +16586,14 @@ void prompt(const char *str)
         }
     }
 }
-*/
 
-/*
-void embEllipse_EllipseObject(float centerX, float centerY, float width, float height, unsigned int rgb, QGraphicsItem* parent)
+void emb_ellipse(float centerX, float centerY, float width, float height, unsigned int rgb, QGraphicsItem* parent)
 {
     debug_message("EllipseObject Constructor()");
     init(centerX, centerY, width, height, rgb, Qt::SolidLine); //TODO: getCurrentLineType
 }
-*/
 
-/*
-void embEllipse_EllipseObject(EllipseObject* obj, QGraphicsItem* parent)
+void emb_ellipse(EllipseObject* obj, QGraphicsItem* parent)
 {
     debug_message("EllipseObject Constructor()");
     if (obj) {
@@ -16970,9 +16601,7 @@ void embEllipse_EllipseObject(EllipseObject* obj, QGraphicsItem* parent)
         setRotation(obj->rotation());
     }
 }
-*/
 
-/*
 void image_init(EmbRect rect, unsigned int rgb, int lineType)
 {
     setData(OBJ_TYPE, type);
@@ -16986,18 +16615,14 @@ void image_init(EmbRect rect, unsigned int rgb, int lineType)
     setLineWeight(0.35); //TODO: pass in proper lineweight
     setPen(objPen);
 }
-*/
 
-/*
 void image_setRect(float x, float y, float w, float h)
 {
     setPos(x, y);
     setRect(0, 0, w, h);
     updatePath();
 }
-*/
 
-/*
 EmbVector image_objectTopLeft()
 {
     float alpha = radians(rotation());
@@ -17005,9 +16630,7 @@ EmbVector image_objectTopLeft()
     EmbVector ptlrot = emb_vector_rotate(tl, alpha);
     return scenePos() + ptlrot;
 }
-*/
 
-/*
 EmbVector image_objectTopRight()
 {
     float alpha = radians(rotation());
@@ -17015,9 +16638,7 @@ EmbVector image_objectTopRight()
     EmbVector ptrrot = emb_vector_rotate(tr, alpha);
     return scenePos() + ptrrot;
 }
-*/
 
-/*
 EmbVector image_objectBottomLeft()
 {
     float alpha = radians(rotation());
@@ -17025,9 +16646,7 @@ EmbVector image_objectBottomLeft()
     EmbVector pblrot = emb_vector_rotate(bl, alpha);
     return scenePos() + pblrot;
 }
-*/
 
-/*
 EmbVector image_objectBottomRight()
 {
     float alpha = radians(rotation());
@@ -17035,29 +16654,9 @@ EmbVector image_objectBottomRight()
     EmbVector pbrrot = emb_vector_rotate(br, alpha);
     return scenePos() + pbrrot;
 }
-*/
 
-/*
-void image_updatePath()
-{
-    QPainterPath path;
-    EmbRect r = rect();
-    path.moveTo(r.bottomLeft());
-    path.lineTo(r.bottomRight());
-    path.lineTo(r.topRight());
-    path.lineTo(r.topLeft());
-    path.lineTo(r.bottomLeft());
-    //NOTE: Reverse the path so that the inside area isn't considered part of the rectangle
-    path.lineTo(r.topLeft());
-    path.lineTo(r.topRight());
-    path.lineTo(r.bottomRight());
-    path.moveTo(r.bottomLeft());
-    setPath(path);
-}
-*/
-
-/*
-void image_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+void
+image_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
     QGraphicsScene* objScene = scene();
     if (!objScene) return;
@@ -17071,78 +16670,6 @@ void image_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWid
 
     painter->drawRect(rect());
 }
-*/
-
-/*
-void image_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_IMAGE) {
-        EmbVector sceneStartPoint = objectRubberPoint("IMAGE_START");
-        EmbVector sceneEndPoint = objectRubberPoint("IMAGE_END");
-        float x = sceneStartPoint.x();
-        float y = sceneStartPoint.y();
-        float w = sceneEndPoint.x() - sceneStartPoint.x();
-        float h = sceneEndPoint.y() - sceneStartPoint.y();
-        setRect(x,y,w,h);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        //TODO: updateRubber() gripping for ImageObject
-    }
-}
-*/
-
-/*
-// Returns the closest snap point to the mouse point
-EmbVector image_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    EmbVector ptl = objectTopLeft();     //Top Left Corner QSnap
-    EmbVector ptr = objectTopRight();    //Top Right Corner QSnap
-    EmbVector pbl = objectBottomLeft();  //Bottom Left Corner QSnap
-    EmbVector pbr = objectBottomRight(); //Bottom Right Corner QSnap
-
-    float ptlDist = EmbLine(mousePoint, ptl).length();
-    float ptrDist = EmbLine(mousePoint, ptr).length();
-    float pblDist = EmbLine(mousePoint, pbl).length();
-    float pbrDist = EmbLine(mousePoint, pbr).length();
-
-    float minDist = std::min(std::min(ptlDist, ptrDist), std::min(pblDist, pbrDist));
-
-    if     (minDist == ptlDist) return ptl;
-    else if (minDist == ptrDist) return ptr;
-    else if (minDist == pblDist) return pbl;
-    else if (minDist == pbrDist) return pbr;
-
-    return scenePos();
-}
-
-std::vector<EmbVector> image_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << objectTopLeft() << objectTopRight() << objectBottomLeft() << objectBottomRight();
-    return gripPoints;
-}
-
-void image_gripEdit(const EmbVector& before, const EmbVector& after)
-{
-    //TODO: gripEdit() for ImageObject
-}
-
-[Menu]
-Name=Draw
-Position=0
-
-[ToolBar]
-Name=Draw
-Position=0
-
-[Tips]
-ToolTip=&Line
-StatusTip=Creates straight line segments:  LINE
-
-[Prompt]
-Alias=L, LINE
 
 //Command: Line
 
@@ -17152,10 +16679,9 @@ global.firstX;
 global.firstY;
 global.prevX;
 global.prevY;
-*/
 
-/*
-void line_main()
+void
+line_main()
 {
     initCommand();
     clearSelection();
@@ -17166,9 +16692,7 @@ void line_main()
     global.prevY = NaN;
     setPromptPrefix(translate("Specify first point: "));
 }
-*/
 
-/*
 void
 line_click(EmbVector p)
 {
@@ -17195,9 +16719,7 @@ line_click(EmbVector p)
         global.prevY = y;
     }
 }
-*/
 
-/*
 void
 line_prompt(const char *str)
 {
@@ -17244,9 +16766,7 @@ line_prompt(const char *str)
         }
     }
 }
-*/
 
-/*
 void line_init(EmbLine line_in, unsigned int rgb, PenStyle lineType)
 {
     setData(OBJ_TYPE, type);
@@ -17261,9 +16781,7 @@ void line_init(EmbLine line_in, unsigned int rgb, PenStyle lineType)
     setLineWeight(0.35); //TODO: pass in proper lineweight
     setPen(objPen);
 }
-*/
 
-/*
 void line_setEndPoint1(EmbVector point1)
 {
     float dx = line.start.x - point1.x;
@@ -17273,9 +16791,7 @@ void line_setEndPoint1(EmbVector point1)
     setLine(0, 0, dx, dy);
     setPos(point1);
 }
-*/
 
-/*
 void line_setEndPoint2(EmbVector point1)
 {
     float dx = line.end.x - point1.x;
@@ -17285,9 +16801,7 @@ void line_setEndPoint2(EmbVector point1)
     setLine(0, 0, dx, dy);
     setPos(point1);
 }
-*/
 
-/*
 EmbVector line_objectEndPoint2()
 {
     EmbLine lyne = line();
@@ -17299,10 +16813,9 @@ EmbVector line_objectEndPoint2()
 
     return scenePos() + rotEnd;
 }
-*/
 
-/*
-EmbVector line_objectMidPoint()
+EmbVector
+line_objectMidPoint()
 {
     EmbLine lyne = line();
     EmbVector mp = lyne.pointAt(0.5) * scale();
@@ -17311,17 +16824,15 @@ EmbVector line_objectMidPoint()
 
     return scenePos() + rotMid;
 }
-*/
 
-/*
-float line_objectAngle()
+float
+line_objectAngle()
 {
     return std::fmodf(line().angle() - rotation(), 360.0);
 }
-*/
 
-/*
-void line_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* widget)
+void
+line_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* widget)
 {
     QGraphicsScene* objScene = scene();
     if (!objScene) return;
@@ -17342,67 +16853,6 @@ void line_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* wi
     if (objScene->property(ENABLE_LWT).toBool() && objScene->property("ENABLE_REAL").toBool()) {
         realRender(painter, path());
     }
-}
-
-void line_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_LINE) {
-        EmbVector sceneStartPoint = objectRubberPoint("LINE_START");
-        EmbVector sceneQSnapPoint = objectRubberPoint("LINE_END");
-
-        setEndPoint1(sceneStartPoint);
-        setEndPoint2(sceneQSnapPoint);
-
-        drawRubberLine(line(), painter, VIEW_COLOR_CROSSHAIR);
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if     (gripPoint == objectEndPoint1()) painter->drawLine(line().p2(), mapFromScene(objectRubberPoint(std::string())));
-            else if (gripPoint == objectEndPoint2()) painter->drawLine(line().p1(), mapFromScene(objectRubberPoint(std::string())));
-            else if (gripPoint == objectMidPoint())  painter->drawLine(line().translated(mapFromScene(objectRubberPoint(std::string()))-mapFromScene(gripPoint)));
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-        }
-    }
-}
-*/
-
-/*
-// Returns the closest snap point to the mouse point
-EmbVector line_mouseSnapPoint(EmbVector& mousePoint)
-{
-    EmbVector endPoint1 = objectEndPoint1();
-    EmbVector endPoint2 = objectEndPoint2();
-    EmbVector midPoint  = objectMidPoint();
-
-    float end1Dist = EmbLine(mousePoint, endPoint1).length();
-    float end2Dist = EmbLine(mousePoint, endPoint2).length();
-    float midDist  = EmbLine(mousePoint, midPoint).length();
-
-    float minDist = std::min(std::min(end1Dist, end2Dist), midDist);
-
-    if     (minDist == end1Dist) return endPoint1;
-    else if (minDist == end2Dist) return endPoint2;
-    else if (minDist == midDist)  return midPoint;
-
-    return scenePos();
-}
-
-std::vector<EmbVector> line_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << objectEndPoint1() << objectEndPoint2() << objectMidPoint();
-    return gripPoints;
-}
-
-void line_gripEdit(EmbVector& before, EmbVector& after)
-{
-    if     (before == objectEndPoint1()) { setEndPoint1(after); }
-    else if (before == objectEndPoint2()) { setEndPoint2(after); }
-    else if (before == objectMidPoint())  { EmbVector delta = after-before; moveBy(delta.x(), delta.y()); }
 }
 
 QPainterPath line_objectSavePath()
@@ -17443,14 +16893,6 @@ void path_init(float x, float y, const QPainterPath& p, unsigned int rgb, int li
     setPen(objPen);
 }
 
-void path_updatePath(const QPainterPath& p)
-{
-    normalPath = p;
-    QPainterPath reversePath = normalPath.toReversed();
-    reversePath.connectPath(normalPath);
-    setPath(reversePath);
-}
-
 void path_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
     QGraphicsScene* objScene = scene();
@@ -17466,38 +16908,8 @@ void path_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidg
     painter->drawPath(objectPath());
 }
 
-void path_updateRubber(QPainter* painter)
-{
-    //TODO: Path Rubber Modes
-
-    //TODO: updateRubber() gripping for PathObject
-
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector path_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    return scenePos();
-}
-
-std::vector<EmbVector> path_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << scenePos(); //TODO: loop thru all path Elements and return their points
-    return gripPoints;
-}
-
-void path_gripEdit(const EmbVector& before, const EmbVector& after)
-{
-    //TODO: gripEdit() for PathObject
-}
-
-QPainterPath path_objectCopyPath()
-{
-    return normalPath;
-}
-
-QPainterPath path_objectSavePath()
+QPainterPath
+path_objectSavePath()
 {
     float s = scale();
     QTransform trans;
@@ -17536,38 +16948,6 @@ void point_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* w
     painter->drawPoint(0,0);
 }
 
-void point_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if (gripPoint == scenePos()) {
-                EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-                drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-            }
-        }
-    }
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector point_mouseSnapPoint(EmbVector& mousePoint)
-{
-    return scenePos();
-}
-
-std::vector<EmbVector> point_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << scenePos();
-    return gripPoints;
-}
-
-void point_gripEdit(EmbVector& before, EmbVector& after)
-{
-    if (before == scenePos()) { EmbVector delta = after-before; moveBy(delta.x(), delta.y()); }
-}
-
 QPainterPath point_objectSavePath()
 {
     QPainterPath path;
@@ -17575,7 +16955,8 @@ QPainterPath point_objectSavePath()
     return path;
 }
 
-void polygon_PolygonObject(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphicsItem* parent)
+void
+emb_polygon(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphicsItem* parent)
 {
     debug_message("PolygonObject Constructor()");
     init(x, y, p, rgb, SolidLine); //TODO: getCurrentLineType
@@ -17591,7 +16972,8 @@ void polygon_PolygonObject(PolygonObject* obj, QGraphicsItem* parent)
     }
 }
 
-void polygon_init(float x, float y, const QPainterPath& p, unsigned int rgb, PenStyle lineType)
+void
+emb_polygon_init(float x, float y, const QPainterPath& p, unsigned int rgb, PenStyle lineType)
 {
     setData(OBJ_TYPE, type);
     setData(OBJ_NAME, "Polygon");
@@ -17607,17 +16989,8 @@ void polygon_init(float x, float y, const QPainterPath& p, unsigned int rgb, Pen
     setPen(objectPen());
 }
 
-void polygon_updatePath(const QPainterPath& p)
-{
-    normalPath = p;
-    QPainterPath closedPath = normalPath;
-    closedPath.closeSubpath();
-    QPainterPath reversePath = closedPath.toReversed();
-    reversePath.connectPath(closedPath);
-    setPath(reversePath);
-}
-
-void polygon_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+void
+emb_polygon_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
     QGraphicsScene* objScene = scene();
     if (!objScene) return;
@@ -17637,152 +17010,6 @@ void polygon_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
     }
 }
 
-void polygon_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_POLYGON) {
-        setPos(objectRubberPoint("POLYGON_POINT_0"));
-
-        bool ok = false;
-        const char *numStr = objectRubberText("POLYGON_NUM_POINTS");
-        if (numStr.isNull()) return;
-        int num = numStr.toInt(&ok);
-        if (!ok) return;
-
-        const char *appendStr;
-        QPainterPath rubberPath;
-        rubberPath.moveTo(mapFromScene(objectRubberPoint("POLYGON_POINT_0")));
-        for (int i = 1; i <= num; i++) {
-            appendStr = "POLYGON_POINT_" + std::string().setNum(i);
-            EmbVector appendPoint = mapFromScene(objectRubberPoint(appendStr));
-            rubberPath.lineTo(appendPoint);
-        }
-        //rubberPath.lineTo(0,0);
-        updatePath(rubberPath);
-
-        //Ensure the path isn't updated until the number of points is changed again
-        setRubberText("POLYGON_NUM_POINTS", std::string());
-    }
-    else if (rubberMode == OBJ_RUBBER_POLYGON_INSCRIBE) {
-        setPos(objectRubberPoint("POLYGON_CENTER"));
-
-        quint16 numSides = objectRubberPoint("POLYGON_NUM_SIDES").x();
-
-        EmbVector inscribePoint = mapFromScene(objectRubberPoint("POLYGON_INSCRIBE_POINT"));
-        EmbLine inscribeLine = EmbLine(EmbVector(0,0), inscribePoint);
-        float inscribeAngle = inscribeLine.angle();
-        float inscribeInc = 360.0/numSides;
-
-        if (painter) drawRubberLine(inscribeLine, painter, VIEW_COLOR_CROSSHAIR);
-
-        QPainterPath inscribePath;
-        //First Point
-        inscribePath.moveTo(inscribePoint);
-        //Remaining Points
-        for (int i = 1; i < numSides; i++) {
-            inscribeLine.setAngle(inscribeAngle + inscribeInc*i);
-            inscribePath.lineTo(inscribeLine.p2());
-        }
-        updatePath(inscribePath);
-    }
-    else if (rubberMode == OBJ_RUBBER_POLYGON_CIRCUMSCRIBE) {
-        setPos(objectRubberPoint("POLYGON_CENTER"));
-
-        quint16 numSides = objectRubberPoint("POLYGON_NUM_SIDES").x();
-
-        EmbVector circumscribePoint = mapFromScene(objectRubberPoint("POLYGON_CIRCUMSCRIBE_POINT"));
-        EmbLine circumscribeLine = EmbLine(EmbVector(0,0), circumscribePoint);
-        float circumscribeAngle = circumscribeLine.angle();
-        float circumscribeInc = 360.0/numSides;
-
-        if (painter) drawRubberLine(circumscribeLine, painter, VIEW_COLOR_CROSSHAIR);
-
-        QPainterPath circumscribePath;
-        //First Point
-        EmbLine prev(circumscribeLine.p2(), EmbVector(0,0));
-        prev = prev.normalVector();
-        circumscribeLine.setAngle(circumscribeAngle + circumscribeInc);
-        EmbLine perp(circumscribeLine.p2(), EmbVector(0,0));
-        perp = perp.normalVector();
-        EmbVector iPoint;
-        perp.intersects(prev, &iPoint);
-        circumscribePath.moveTo(iPoint);
-        //Remaining Points
-        for (int i = 2; i <= numSides; i++) {
-            prev = perp;
-            circumscribeLine.setAngle(circumscribeAngle + circumscribeInc*i);
-            perp = EmbLine(circumscribeLine.p2(), EmbVector(0,0));
-            perp = perp.normalVector();
-            perp.intersects(prev, &iPoint);
-            circumscribePath.lineTo(iPoint);
-        }
-        updatePath(circumscribePath);
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            int elemCount = normalPath.elementCount();
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if (gripIndex == -1) gripIndex = findIndex(gripPoint);
-            if (gripIndex == -1) return;
-
-            int m = 0;
-            int n = 0;
-
-            if (!gripIndex) {
-                m = elemCount-1;
-                n = 1;
-            }
-            else if (gripIndex == elemCount-1) {
-                m = elemCount-2;
-                n = 0;
-            }
-            else {
-                m = gripIndex-1;
-                n = gripIndex+1;
-            }
-            QPainterPath::Element em = normalPath.elementAt(m);
-            QPainterPath::Element en = normalPath.elementAt(n);
-            EmbVector emPoint = EmbVector(em.x, em.y);
-            EmbVector enPoint = EmbVector(en.x, en.y);
-            painter->drawLine(emPoint, mapFromScene(objectRubberPoint(std::string())));
-            painter->drawLine(enPoint, mapFromScene(objectRubberPoint(std::string())));
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-        }
-    }
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector polygon_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    QPainterPath::Element element = normalPath.elementAt(0);
-    EmbVector closestPoint = mapToScene(EmbVector(element.x, element.y));
-    float closestDist = EmbLine(mousePoint, closestPoint).length();
-    int elemCount = normalPath.elementCount();
-    for (int i = 0; i < elemCount; ++i) {
-        element = normalPath.elementAt(i);
-        EmbVector elemPoint = mapToScene(element.x, element.y);
-        float elemDist = EmbLine(mousePoint, elemPoint).length();
-        if (elemDist < closestDist) {
-            closestPoint = elemPoint;
-            closestDist = elemDist;
-        }
-    }
-    return closestPoint;
-}
-
-std::vector<EmbVector> polygon_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    QPainterPath::Element element;
-    for (int i = 0; i < normalPath.elementCount(); ++i) {
-        element = normalPath.elementAt(i);
-        gripPoints << mapToScene(element.x, element.y);
-    }
-    return gripPoints;
-}
-
 int polygon_findIndex(EmbVector point)
 {
     int i = 0;
@@ -17797,22 +17024,8 @@ int polygon_findIndex(EmbVector point)
     return -1;
 }
 
-void polygon_gripEdit(const EmbVector& before, const EmbVector& after)
-{
-    gripIndex = findIndex(before);
-    if (gripIndex == -1) return;
-    EmbVector a = mapFromScene(after);
-    normalPath.setElementPositionAt(gripIndex, a.x(), a.y());
-    updatePath(normalPath);
-    gripIndex = -1;
-}
-
-QPainterPath polygon_objectCopyPath()
-{
-    return normalPath;
-}
-
-QPainterPath polygon_objectSavePath()
+QPainterPath
+polygon_objectSavePath()
 {
     QPainterPath closedPath = normalPath;
     closedPath.closeSubpath();
@@ -17823,13 +17036,15 @@ QPainterPath polygon_objectSavePath()
     return trans.map(closedPath);
 }
 
-void embPolyline_PolylineObject(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphicsItem* parent)
+void
+emb_polyline(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphicsItem* parent)
 {
     debug_message("PolylineObject Constructor()");
     init(x, y, p, rgb, Qt::SolidLine); //TODO: getCurrentLineType
 }
 
-void embPolyline_PolylineObject(PolylineObject* obj, QGraphicsItem* parent)
+void
+emb_polyline(EmbPolyline* obj, QGraphicsItem* parent)
 {
     debug_message("PolylineObject Constructor()");
     if (obj) {
@@ -17855,120 +17070,6 @@ void embPolyline_init(float x, float y, QPainterPath *p, unsigned int rgb, int l
     setPen(objectPen());
 }
 
-void embPolyline_updatePath(const QPainterPath& p)
-{
-    normalPath = p;
-    QPainterPath reversePath = normalPath.toReversed();
-    reversePath.connectPath(normalPath);
-    setPath(reversePath);
-}
-
-void embPolyline_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawPath(normalPath);
-
-    if (objScene->property(ENABLE_LWT).toBool() && objScene->property(ENABLE_REAL).toBool()) { realRender(painter, normalPath); }
-}
-
-void embPolyline_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_POLYLINE) {
-        setPos(objectRubberPoint("POLYLINE_POINT_0"));
-
-        EmbLine rubberLine(normalPath.currentPosition(), mapFromScene(objectRubberPoint(std::string())));
-        if (painter) drawRubberLine(rubberLine, painter, VIEW_COLOR_CROSSHAIR);
-
-        bool ok = false;
-        const char *numStr = objectRubberText("POLYLINE_NUM_POINTS");
-        if (numStr.isNull()) return;
-        int num = numStr.toInt(&ok);
-        if (!ok) return;
-
-        const char *appendStr;
-        QPainterPath rubberPath;
-        for (int i = 1; i <= num; i++) {
-            appendStr = "POLYLINE_POINT_" + std::string().setNum(i);
-            EmbVector appendPoint = mapFromScene(objectRubberPoint(appendStr));
-            rubberPath.lineTo(appendPoint);
-        }
-        updatePath(rubberPath);
-
-        //Ensure the path isn't updated until the number of points is changed again
-        setRubberText("POLYLINE_NUM_POINTS", std::string());
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            int elemCount = normalPath.elementCount();
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if (gripIndex == -1) gripIndex = findIndex(gripPoint);
-            if (gripIndex == -1) return;
-
-            if (!gripIndex) { //First
-                QPainterPath::Element ef = normalPath.elementAt(1);
-                EmbVector efPoint = EmbVector(ef.x, ef.y);
-                painter->drawLine(efPoint, mapFromScene(objectRubberPoint(std::string())));
-            }
-            else if (gripIndex == elemCount-1) { //Last
-                QPainterPath::Element el = normalPath.elementAt(gripIndex-1);
-                EmbVector elPoint = EmbVector(el.x, el.y);
-                painter->drawLine(elPoint, mapFromScene(objectRubberPoint(std::string())));
-            }
-            else { //Middle
-                QPainterPath::Element em = normalPath.elementAt(gripIndex-1);
-                QPainterPath::Element en = normalPath.elementAt(gripIndex+1);
-                EmbVector emPoint = EmbVector(em.x, em.y);
-                EmbVector enPoint = EmbVector(en.x, en.y);
-                painter->drawLine(emPoint, mapFromScene(objectRubberPoint(std::string())));
-                painter->drawLine(enPoint, mapFromScene(objectRubberPoint(std::string())));
-            }
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-        }
-    }
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector embPolyline_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    QPainterPath::Element element = normalPath.elementAt(0);
-    EmbVector closestPoint = mapToScene(EmbVector(element.x, element.y));
-    float closestDist = EmbLine(mousePoint, closestPoint).length();
-    int elemCount = normalPath.elementCount();
-    for (int i = 0; i < elemCount; ++i) {
-        element = normalPath.elementAt(i);
-        EmbVector elemPoint = mapToScene(element.x, element.y);
-        float elemDist = EmbLine(mousePoint, elemPoint).length();
-        if (elemDist < closestDist) {
-            closestPoint = elemPoint;
-            closestDist = elemDist;
-        }
-    }
-    return closestPoint;
-}
-
-std::vector<EmbVector> embPolyline_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    QPainterPath::Element element;
-    for (int i = 0; i < normalPath.elementCount(); ++i) {
-        element = normalPath.elementAt(i);
-        gripPoints << mapToScene(element.x, element.y);
-    }
-    return gripPoints;
-}
-
 int embPolyline_findIndex(const EmbVector& point)
 {
     int elemCount = normalPath.elementCount();
@@ -17980,21 +17081,6 @@ int embPolyline_findIndex(const EmbVector& point)
         if (itemPoint == elemPoint) return i;
     }
     return -1;
-}
-
-void embPolyline_gripEdit(const EmbVector& before, const EmbVector& after)
-{
-    gripIndex = findIndex(before);
-    if (gripIndex == -1) return;
-    EmbVector a = mapFromScene(after);
-    normalPath.setElementPositionAt(gripIndex, a.x(), a.y());
-    updatePath(normalPath);
-    gripIndex = -1;
-}
-
-QPainterPath embPolyline_objectCopyPath()
-{
-    return normalPath;
 }
 
 QPainterPath embPolyline_objectSavePath()
@@ -18071,151 +17157,6 @@ EmbVector embRect_bottomRight(EmbRect rect)
     */
     return v;
 }
-
-/*
-void embRect_updatePath()
-{
-    QPainterPath path;
-    EmbRect r = rect();
-    path.moveTo(r.bottomLeft());
-    path.lineTo(r.bottomRight());
-    path.lineTo(r.topRight());
-    path.lineTo(r.topLeft());
-    path.lineTo(r.bottomLeft());
-    //NOTE: Reverse the path so that the inside area isn't considered part of the rectangle
-    path.lineTo(r.topLeft());
-    path.lineTo(r.topRight());
-    path.lineTo(r.bottomRight());
-    path.moveTo(r.bottomLeft());
-    setPath(path);
-}
-
-void rect_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawRect(rect());
-}
-*/
-
-/*
-void rect_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_RECTANGLE) {
-        EmbVector sceneStartPoint = objectRubberPoint("RECTANGLE_START");
-        EmbVector sceneEndPoint = objectRubberPoint("RECTANGLE_END");
-        float x = sceneStartPoint.x();
-        float y = sceneStartPoint.y();
-        float w = sceneEndPoint.x() - sceneStartPoint.x();
-        float h = sceneEndPoint.y() - sceneStartPoint.y();
-        setRect(x,y,w,h);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            //TODO: Make this work with rotation & scaling
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            EmbVector after = objectRubberPoint(std::string());
-            EmbVector delta = after-gripPoint;
-            if (gripPoint == objectTopLeft()) {
-                painter->drawPolygon(mapFromScene(EmbRect(after.x(), after.y(), objectWidth()-delta.x(), objectHeight()-delta.y())));
-            }
-            else if (gripPoint == objectTopRight()) {
-                painter->drawPolygon(mapFromScene(EmbRect(objectTopLeft().x(), objectTopLeft().y()+delta.y(), objectWidth()+delta.x(), objectHeight()-delta.y())));
-            }
-            else if (gripPoint == objectBottomLeft()) {
-                painter->drawPolygon(mapFromScene(EmbRect(objectTopLeft().x()+delta.x(), objectTopLeft().y(), objectWidth()-delta.x(), objectHeight()+delta.y())));
-            }
-            else if (gripPoint == objectBottomRight()) {
-                painter->drawPolygon(mapFromScene(EmbRect(objectTopLeft().x(), objectTopLeft().y(), objectWidth()+delta.x(), objectHeight()+delta.y())));
-            }
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            EmbVector after = objectRubberPoint(std::string());
-            EmbVector delta = after-gripPoint;
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-        }
-    }
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector rect_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    EmbVector ptl = objectTopLeft();     //Top Left Corner QSnap
-    EmbVector ptr = objectTopRight();    //Top Right Corner QSnap
-    EmbVector pbl = objectBottomLeft();  //Bottom Left Corner QSnap
-    EmbVector pbr = objectBottomRight(); //Bottom Right Corner QSnap
-
-    float ptlDist = EmbLine(mousePoint, ptl).length();
-    float ptrDist = EmbLine(mousePoint, ptr).length();
-    float pblDist = EmbLine(mousePoint, pbl).length();
-    float pbrDist = EmbLine(mousePoint, pbr).length();
-
-    float minDist = std::min(std::min(ptlDist, ptrDist), std::min(pblDist, pbrDist));
-
-    if     (minDist == ptlDist) return ptl;
-    else if (minDist == ptrDist) return ptr;
-    else if (minDist == pblDist) return pbl;
-    else if (minDist == pbrDist) return pbr;
-
-    return scenePos();
-}
-
-std::vector<EmbVector> rect_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << objectTopLeft() << objectTopRight() << objectBottomLeft() << objectBottomRight();
-    return gripPoints;
-}
-
-void rect_gripEdit(const EmbVector& before, const EmbVector& after)
-{
-    EmbVector delta = after-before;
-    if (before == objectTopLeft()) {
-        setRect(after.x(), after.y(), objectWidth()-delta.x(), objectHeight()-delta.y());
-    }
-    else if (before == objectTopRight()) {
-        setRect(objectTopLeft().x(), objectTopLeft().y()+delta.y(), objectWidth()+delta.x(), objectHeight()-delta.y());
-    }
-    else if (before == objectBottomLeft()) {
-        setRect(objectTopLeft().x()+delta.x(), objectTopLeft().y(), objectWidth()-delta.x(), objectHeight()+delta.y());
-    }
-    else if (before == objectBottomRight()) {
-        setRect(objectTopLeft().x(), objectTopLeft().y(), objectWidth()+delta.x(), objectHeight()+delta.y());
-    }
-}
-
-QPainterPath rect_objectSavePath()
-{
-    QPainterPath path;
-    EmbRect r = rect();
-    path.moveTo(r.bottomLeft());
-    path.lineTo(r.bottomRight());
-    path.lineTo(r.topRight());
-    path.lineTo(r.topLeft());
-    path.lineTo(r.bottomLeft());
-
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-    return trans.map(path);
-}
-*/
 
 /*
     View view = views[settings.pattern_index];
@@ -18492,242 +17433,6 @@ void embEllipse_setDiameterMinor(EmbEllipse *ellipse, float diameter)
     */
 }
 
-EmbVector ellipse_objectQuadrant0(EmbEllipse *ellipse)
-{
-    EmbVector v;
-    v.x = 0.0;
-    v.y = 0.0;
-    printf("%f", ellipse->radius.x);
-    /*
-    float halfW = objectWidth()/2.0;
-    float rot = radians(rotation());
-    float x = halfW*cos(rot);
-    float y = halfW*sin(rot);
-    return objectCenter() + EmbVector(x,y);
-    */
-    return v;
-}
-
-EmbVector ellipse_objectQuadrant90(EmbEllipse *ellipse)
-{
-    EmbVector v;
-    v.x = 0.0;
-    v.y = 0.0;
-    printf("%f", ellipse->radius.x);
-    /*
-    float halfH = objectHeight()/2.0;
-    float rot = radians(rotation()+90.0);
-    float x = halfH * cos(rot);
-    float y = halfH * sin(rot);
-    return objectCenter() + EmbVector(x,y);
-    */
-    return v;
-}
-
-EmbVector ellipse_objectQuadrant180(EmbEllipse *ellipse)
-{
-    EmbVector v;
-    v.x = 0.0;
-    v.y = 0.0;
-    printf("%f", ellipse->radius.x);
-    /*
-    float halfW = objectWidth()/2.0;
-    float rot = radians(rotation()+180.0);
-    float x = halfW*cos(rot);
-    float y = halfW*sin(rot);
-    return objectCenter() + EmbVector(x,y);
-    */
-    return v;
-}
-
-EmbVector ellipse_objectQuadrant270(EmbEllipse *ellipse)
-{
-    EmbVector v;
-    v.x = 0.0;
-    v.y = 0.0;
-    printf("%f", ellipse->radius.x);
-    /*
-    float halfH = objectHeight()/2.0;
-    float rot = radians(rotation()+270.0);
-    float x = halfH*cos(rot);
-    float y = halfH*sin(rot);
-    return objectCenter() + EmbVector(x,y);
-    */
-    return v;
-}
-
-void embEllipse_updatePath()
-{
-    /*
-    QPainterPath path;
-    EmbRect r = rect();
-    path.arcMoveTo(r, 0);
-    path.arcTo(r, 0, 360);
-    //NOTE: Reverse the path so that the inside area isn't considered part of the ellipse
-    path.arcTo(r, 0, -360);
-    setPath(path);
-    */
-}
-
-/*
-void embEllipse_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawEllipse(rect());
-}
-*/
-
-/*
-void embEllipse_updateRubber(QPainter* painter)
-{
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_ELLIPSE_LINE) {
-        EmbVector sceneLinePoint1 = objectRubberPoint("ELLIPSE_LINE_POINT1");
-        EmbVector sceneLinePoint2 = objectRubberPoint("ELLIPSE_LINE_POINT2");
-        EmbVector itemLinePoint1  = mapFromScene(sceneLinePoint1);
-        EmbVector itemLinePoint2  = mapFromScene(sceneLinePoint2);
-        EmbLine itemLine(itemLinePoint1, itemLinePoint2);
-        if (painter) drawRubberLine(itemLine, painter, VIEW_COLOR_CROSSHAIR);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_ELLIPSE_MAJORDIAMETER_MINORRADIUS) {
-        EmbVector sceneAxis1Point1 = objectRubberPoint("ELLIPSE_AXIS1_POINT1");
-        EmbVector sceneAxis1Point2 = objectRubberPoint("ELLIPSE_AXIS1_POINT2");
-        EmbVector sceneCenterPoint = objectRubberPoint("ELLIPSE_CENTER");
-        EmbVector sceneAxis2Point2 = objectRubberPoint("ELLIPSE_AXIS2_POINT2");
-        float ellipseWidth = objectRubberPoint("ELLIPSE_WIDTH").x();
-        float ellipseRot = objectRubberPoint("ELLIPSE_ROT").x();
-
-        //TODO: incorporate perpendicularDistance() into libcgeometry
-        float px = sceneAxis2Point2.x();
-        float py = sceneAxis2Point2.y();
-        float x1 = sceneAxis1Point1.x();
-        float y1 = sceneAxis1Point1.y();
-        EmbLine line(sceneAxis1Point1, sceneAxis1Point2);
-        EmbLine norm = line.normalVector();
-        float dx = px-x1;
-        float dy = py-y1;
-        norm.translate(dx, dy);
-        EmbVector iPoint;
-        norm.intersects(line, &iPoint);
-        float ellipseHeight = EmbLine(px, py, iPoint.x(), iPoint.y()).length()*2.0;
-
-        setCenter(sceneCenterPoint);
-        setSize(ellipseWidth, ellipseHeight);
-        setRotation(-ellipseRot);
-
-        EmbVector itemCenterPoint = mapFromScene(sceneCenterPoint);
-        EmbVector itemAxis2Point2 = mapFromScene(sceneAxis2Point2);
-        EmbLine itemLine(itemCenterPoint, itemAxis2Point2);
-        if (painter) drawRubberLine(itemLine, painter, VIEW_COLOR_CROSSHAIR);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_ELLIPSE_MAJORRADIUS_MINORRADIUS) {
-        EmbVector sceneAxis1Point2 = objectRubberPoint("ELLIPSE_AXIS1_POINT2");
-        EmbVector sceneCenterPoint = objectRubberPoint("ELLIPSE_CENTER");
-        EmbVector sceneAxis2Point2 = objectRubberPoint("ELLIPSE_AXIS2_POINT2");
-        float ellipseWidth = objectRubberPoint("ELLIPSE_WIDTH").x();
-        float ellipseRot = objectRubberPoint("ELLIPSE_ROT").x();
-
-        //TODO: incorporate perpendicularDistance() into libcgeometry
-        float px = sceneAxis2Point2.x();
-        float py = sceneAxis2Point2.y();
-        float x1 = sceneCenterPoint.x();
-        float y1 = sceneCenterPoint.y();
-        EmbLine line(sceneCenterPoint, sceneAxis1Point2);
-        EmbLine norm = line.normalVector();
-        float dx = px-x1;
-        float dy = py-y1;
-        norm.translate(dx, dy);
-        EmbVector iPoint;
-        norm.intersects(line, &iPoint);
-        float ellipseHeight = EmbLine(px, py, iPoint.x(), iPoint.y()).length()*2.0;
-
-        setCenter(sceneCenterPoint);
-        setSize(ellipseWidth, ellipseHeight);
-        setRotation(-ellipseRot);
-
-        EmbVector itemCenterPoint = mapFromScene(sceneCenterPoint);
-        EmbVector itemAxis2Point2 = mapFromScene(sceneAxis2Point2);
-        EmbLine itemLine(itemCenterPoint, itemAxis2Point2);
-        if (painter) drawRubberLine(itemLine, painter, VIEW_COLOR_CROSSHAIR);
-        updatePath();
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        //TODO: updateRubber() gripping for EllipseObject
-    }
-}
-*/
-
-/*
-// Returns the closest snap point to the mouse point
-EmbVector ellipse_mouseSnapPoint(const EmbVector& mousePoint)
-{
-    EmbVector center  = objectCenter();
-    EmbVector quad0   = objectQuadrant0();
-    EmbVector quad90  = objectQuadrant90();
-    EmbVector quad180 = objectQuadrant180();
-    EmbVector quad270 = objectQuadrant270();
-
-    float cntrDist = EmbLine(mousePoint, center).length();
-    float q0Dist   = EmbLine(mousePoint, quad0).length();
-    float q90Dist  = EmbLine(mousePoint, quad90).length();
-    float q180Dist = EmbLine(mousePoint, quad180).length();
-    float q270Dist = EmbLine(mousePoint, quad270).length();
-
-    float minDist = std::min(std::min(std::min(q0Dist, q90Dist), std::min(q180Dist, q270Dist)), cntrDist);
-
-    if     (minDist == cntrDist) return center;
-    else if (minDist == q0Dist)   return quad0;
-    else if (minDist == q90Dist)  return quad90;
-    else if (minDist == q180Dist) return quad180;
-    else if (minDist == q270Dist) return quad270;
-
-    return scenePos();
-}
-*/
-
-/*
-std::vector<EmbVector> ellipse_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints;
-    gripPoints << objectCenter() << objectQuadrant0() << objectQuadrant90() << objectQuadrant180() << objectQuadrant270();
-    return gripPoints;
-}
-*/
-
-/*
-void embEllipse_gripEdit(const EmbVector& before, const EmbVector& after)
-{
-    //TODO: gripEdit() for EllipseObject
-}
-*/
-
-/*
-QPainterPath ellipse_objectSavePath()
-{
-    QPainterPath path;
-    EmbRect r = rect();
-    path.arcMoveTo(r, 0);
-    path.arcTo(r, 0, 360);
-
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-    return trans.map(path);
-}
-*/
-
 /*
  * BASIC FUNCTIONS
  */
@@ -18901,9 +17606,7 @@ void textSingle_init(const std::string& str, float x, float y, unsigned int rgb,
     setLineWeight(0.35); //TODO: pass in proper lineweight
     setPen(objPen);
 }
-*/
 
-/*
 std::stringList text_single_objectTextJustifyList()
 {
     std::stringList justifyList;
@@ -18914,9 +17617,7 @@ std::stringList text_single_objectTextJustifyList()
     justifyList << "Bottom Left" << "Bottom Center" << "Bottom Right";
     return justifyList;
 }
-*/
 
-/*
 void textSingle_setText(const std::string& str)
 {
     objText = str;
@@ -19123,128 +17824,6 @@ void textSingle_setTextUpsideDown(char val)
     setText(objText);
     */
 }
-
-void textSingle_paint() // QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    /*
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).tochar()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawPath(objTextPath);
-    */
-}
-
-void textSingle_updateRubber() // QPainter* painter)
-{
-    /*
-    int rubberMode = objectRubberMode();
-    if (rubberMode == OBJ_RUBBER_TEXTSINGLE) {
-        setTextFont(objectRubberText("TEXT_FONT"));
-        setTextJustify(objectRubberText("TEXT_JUSTIFY"));
-        setPos(objectRubberPoint("TEXT_POINT"));
-        EmbVector hr = objectRubberPoint("TEXT_HEIGHT_ROTATION");
-        setTextSize(hr.x());
-        setRotation(hr.y());
-        setText(objectRubberText("TEXT_RAPID"));
-    }
-    else if (rubberMode == OBJ_RUBBER_GRIP) {
-        if (painter) {
-            EmbVector gripPoint = objectRubberPoint("GRIP_POINT");
-            if (gripPoint == scenePos()) {
-                painter->drawPath(objectPath().translated(mapFromScene(objectRubberPoint(std::string()))-mapFromScene(gripPoint)));
-            }
-
-            EmbLine rubLine(mapFromScene(gripPoint), mapFromScene(objectRubberPoint(std::string())));
-            drawRubberLine(rubLine, painter, VIEW_COLOR_CROSSHAIR);
-        }
-    }
-    */
-}
-
-// Returns the closest snap point to the mouse point
-EmbVector textSingle_mouseSnapPoint(EmbVector mousePoint)
-{
-    EmbVector v = {0.0, 0.0};
-    printf("%f %f", mousePoint.x, mousePoint.y);
-    //return scenePos();
-    return v;
-}
-
-/*
-std::vector<EmbVector> textSingle_allGripPoints()
-{
-    std::vector<EmbVector> gripPoints = {};
-    // scenePos();
-    return gripPoints;
-}
-*/
-
-void textSingle_gripEdit(EmbVector before, EmbVector after)
-{
-    printf("%f %f", before.x, after.x);
-    /*
-    if (before == scenePos()) {
-        EmbVector delta = after-before;
-        moveBy(delta.x(), delta.y());
-    }
-    */
-}
-
-/*
-std::vector<QPainterPath> text_single_subPathList()
-{
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-
-    std::vector<QPainterPath> pathList;
-
-    QPainterPath path = objTextPath;
-
-    QPainterPath::Element element;
-    std::vector<int> pathMoves;
-    int numMoves = 0;
-
-    for (int i = 0; i < path.elementCount(); i++) {
-        element = path.elementAt(i);
-        if (element.isMoveTo()) {
-            pathMoves << i;
-            numMoves++;
-        }
-    }
-
-    pathMoves << path.elementCount();
-
-    for (int p = 0; p < pathMoves.size()-1 && p < numMoves; p++) {
-        QPainterPath subPath;
-        for (int i = pathMoves.value(p); i < pathMoves.value(p+1); i++) {
-            element = path.elementAt(i);
-            if (element.isMoveTo()) {
-                subPath.moveTo(element.x, element.y);
-            }
-            else if (element.isLineTo()) {
-                subPath.lineTo(element.x, element.y);
-            }
-            else if (element.isCurveTo()) {
-                subPath.cubicTo(path.elementAt(i  ).x, path.elementAt(i  ).y,  //control point 1
-                                path.elementAt(i+1).x, path.elementAt(i+1).y,  //control point 2
-                                path.elementAt(i+2).x, path.elementAt(i+2).y); //end point
-            }
-        }
-        pathList.append(trans.map(subPath));
-    }
-
-    return pathList;
-}
-*/
 
 /* Finds the unit length vector a result in the same direction as a vector.
  *
