@@ -34,6 +34,7 @@
 #include <math.h>
 #include <time.h>
 #include <inttypes.h>
+#include <string.h>
 
 void *
 emb_fopen(const char *fname, const char *mode)
@@ -221,15 +222,15 @@ void fpad(void *f, char c, int n);
 void write_24bit(void* file, int);
 int check_header_present(void* file, int minimum_header_length);
 
-unsigned short fread_uint16(void *file);
-short fread_int16(void* f);
+unsigned short emb_read_u16(void *file);
+short emb_read_i16(void* f);
 
 void emb_write_u32be(void* f, unsigned int data);
 void emb_write_u32(void* f, unsigned int data);
-void binaryWriteIntBE(void* f, int data);
-void binaryWriteInt(void* f, int data);
-void binaryWriteUShort(void* f, unsigned short data);
-void binaryWriteUShortBE(void* f, unsigned short data);
+void emb_write_i32be(void* f, int data);
+void emb_write_i32(void* f, int data);
+void emb_write_u16(void* f, unsigned short data);
+void emb_write_u16BE(void* f, unsigned short data);
 void emb_write_i16(void* f, int16_t data);
 
 bcf_file_difat* bcf_difat_create(void* file, unsigned int fatSectors, const unsigned int sectorSize);
@@ -2625,6 +2626,31 @@ embColor_make(unsigned char red, unsigned char green, unsigned char blue)
     return c;
 }
 
+/* TODO: Replace with embInt_read macros. */
+short
+emb_read_i16(void* f)
+{
+    short x;
+    emb_read(f, &x, EMB_INT16_LITTLE);
+    if (emb_verbose>1) {
+        printf("read int16_le: %d\n", x);
+    }
+    return x;
+}
+
+/* \todo replace with embInt_read
+ */
+unsigned short
+emb_read_u16(void* f)
+{
+    unsigned short x;
+    emb_read(f, &x, EMB_INT16_LITTLE);
+    if (emb_verbose>1) {
+        printf("read uint16_le: %u\n", x);
+    }
+    return x;
+}
+
 /* Reverses the byte order of a bytes number of bytes
  * at memory location a b. Only works for 2 or 4 byte arrays.
  */
@@ -3007,36 +3033,109 @@ emb_read(void* f, void *b, int mode)
     }
 }
 
-/* Wrapper for fwrite that ensures that the endianness is correct. */
+/* . */
 void
-emb_write(void* f, void *b, int mode)
+fpad(void* file, char c, int n)
 {
-    int endian = mode & 0x01;
-    int length = mode - endian;
-    if (endian != ENDIAN_HOST) {
-        reverse_byte_order(b, length);
+    int i;
+    for (i = 0; i < n; i++) {
+        emb_fwrite(&c, 1, file);
     }
-    if (emb_verbose>1) {
-        switch (mode) {
-        case EMB_INT16_LITTLE:
-            printf("write int16_le: %d\n", *((short*)b));
-            break;
-        case EMB_INT16_BIG:
-            printf("write int16_be: %d\n", *((short*)b));
-            break;
-        case EMB_INT32_LITTLE:
-            printf("write int32_le: %d\n", *((int*)b));
-            break;
-        case EMB_INT32_BIG:
-            printf("write int32_be: %d\n", *((int*)b));
-            break;
-        default:
-            puts("ERROR: the mode supplied to fwrite_int is invalid.");
-            break;
-        }
-    }
+}
 
-    emb_fwrite(b, length, f);
+/* \todo replace with embInt_read
+ */
+void
+emb_write_i16(void* f, int16_t data)
+{
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 2);
+#endif
+    emb_fwrite(b, 2, f);
+}
+
+/* \todo replace with embInt_read
+ */
+void
+emb_write_i16be(void* f, int16_t data)
+{
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 2);
+#endif
+    emb_fwrite(b, 2, f);
+}
+
+/* \todo replace with embInt_read
+ */
+void
+emb_write_u16(void* f, uint16_t data)
+{
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 2);
+#endif
+    emb_fwrite(b, 2, f);
+}
+
+/* \todo replace with embInt_read
+ */
+void
+emb_write_u16BE(void* f, unsigned short data)
+{
+    void *b = (void*)data;
+#if EMB_BIG_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 2);
+#endif
+    emb_fwrite(b, 2, f);
+}
+
+/* \todo replace with embInt_read
+ */
+void
+emb_write_i32(void* f, int data)
+{
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 4);
+#endif
+    emb_fwrite(b, 4, f);
+}
+
+/* . */
+void
+emb_write_i32be(void* f, int data)
+{
+    void *b = (void*)data;
+#if EMB_BIG_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 4);
+#endif
+    emb_fwrite(b, 4, f);
+}
+
+/* \todo replace with embInt_read
+ */
+void
+emb_write_u32(void* f, unsigned int data)
+{
+    void *b = (void*)data;
+#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 4);
+#endif
+    emb_fwrite(b, 4, f);
+}
+
+/* \todo replace with embInt_read
+ */
+void
+emb_write_u32be(void* f, unsigned int data)
+{
+    void *b = (void*)data;
+#if EMB_BIG_ENDIAN != ENDIAN_HOST
+    reverse_byte_order(b, 4);
+#endif
+    emb_fwrite(b, 4, f);
 }
 
 /* end of encoding section. */
@@ -3971,7 +4070,7 @@ CompoundFileDirectoryEntry(void* file)
     memory_set(dir->directoryEntryName, 0, 32);
     parseDirectoryEntryName(file, dir);
     dir->next = 0;
-    dir->directoryEntryNameLength = fread_uint16(file);
+    dir->directoryEntryNameLength = emb_read_u16(file);
     dir->objectType = (unsigned char)fgetc(file);
     if ((dir->objectType != ObjectTypeStorage) && (dir->objectType != ObjectTypeStream) && (dir->objectType != ObjectTypeRootEntry)) {
         printf("ERROR: compound-file-directory.c CompoundFileDirectoryEntry()");
@@ -4084,12 +4183,12 @@ bcfFileHeader_read(void* file)
         puts("ERROR: failed to read CLSID bytes from bcf file.");
         return header;
     }
-    header.minorVersion = fread_uint16(file);
-    header.majorVersion = fread_uint16(file);
-    header.byteOrder = fread_uint16(file);
-    header.sectorShift = fread_uint16(file);
-    header.miniSectorShift = fread_uint16(file);
-    header.reserved1 = fread_uint16(file);
+    header.minorVersion = emb_read_u16(file);
+    header.majorVersion = emb_read_u16(file);
+    header.byteOrder = emb_read_u16(file);
+    header.sectorShift = emb_read_u16(file);
+    header.miniSectorShift = emb_read_u16(file);
+    header.reserved1 = emb_read_u16(file);
     emb_read(file, &(header.reserved2), EMB_INT32_LITTLE);
     emb_read(file, &(header.numberOfDirectorySectors), EMB_INT32_LITTLE);
     emb_read(file, &(header.numberOfFATSectors), EMB_INT32_LITTLE);
@@ -4545,7 +4644,7 @@ testMain(int test_index)
         EmbReal epsilon = 0.001f;
         EmbVector p0, p1;
         /* Problem */
-        EmbGeometry c1 = emb_circle_init(0.0f, 0.0f, 3.0f);
+        EmbGeometry c1 = emb_circle(0.0f, 0.0f, 3.0f);
         /* Solution */
         EmbVector t0 = {2.2500f, 1.9843f};
         EmbVector t1 = {2.2500f, -1.9843f};
@@ -4644,33 +4743,25 @@ testMain(int test_index)
         return 0;
     }
     case 4: {
-        EmbGeometry g;
-        EmbArc arc;
+        EmbGeometry g = emb_arc(1.0, 0.0, 0.0, 0.0, 2.0, 1.0);
         EmbVector center, chordMid;
         EmbReal bulge, radius, diameter, chord, sagitta, apothem, incAngle;
         char clockwise;
 
         bulge = -0.414213562373095f;
-        arc.start.x = 1.0f;
-        arc.start.y = 0.0f;
-        arc.mid.x = 0.0f; /* FIXME */
-        arc.mid.y = 0.0f;
-        arc.end.x = 2.0f;
-        arc.end.y = 1.0f;
-        center = emb_arc_center(arc);
-        g.object.arc = arc;
+        center = emb_arc_center(g);
         chord = emb_get_real(&g, EMB_REAL_CHORD);
-        radius = emb_arc_radius(arc);
-        diameter = emb_arc_diameter(arc);
-        chordMid = emb_arc_chordMid(arc);
-        sagitta = emb_arc_sagitta(arc);
-        apothem = emb_arc_apothem(arc);
-        incAngle = emb_arc_incAngle(arc);
-        clockwise = emb_arc_clockwise(arc);
-        /* bulge = emb_arc_bulge(arc); */
+        radius = emb_arc_radius(g);
+        diameter = emb_arc_diameter(g);
+        chordMid = emb_arc_chordMid(g);
+        sagitta = emb_arc_sagitta(g);
+        apothem = emb_arc_apothem(g);
+        incAngle = emb_arc_incAngle(g);
+        clockwise = emb_arc_clockwise(g);
+        /* bulge = emb_arc_bulge(g); */
         if (emb_verbose > 0) {
             fprintf(stdout, "Clockwise Test:\n");
-            printArcResults(bulge, arc, center,
+            printArcResults(bulge, g.object.arc, center,
                         radius, diameter,
                         chord, chordMid,
                         sagitta,   apothem,
@@ -4678,26 +4769,21 @@ testMain(int test_index)
         }
 
         bulge  = 2.414213562373095f;
-        arc.start.x = 4.0f;
-        arc.start.y = 0.0f;
-        arc.mid.x = 0.0f; /* FIXME */
-        arc.mid.y = 0.0f;
-        arc.end.x = 5.0f;
-        arc.end.y = 1.0f;
-        center = emb_arc_center(arc);
-        g.object.arc = arc;
+        /* FIXME: midpoints */
+        g = emb_arc(4.0, 0.0, 0.0, 0.0, 5.0, 1.0);
+        center = emb_arc_center(g);
         chord = emb_get_real(&g, EMB_REAL_CHORD);
-        radius = emb_arc_radius(arc);
-        diameter = emb_arc_diameter(arc);
-        chordMid = emb_arc_chordMid(arc);
-        sagitta = emb_arc_sagitta(arc);
-        apothem = emb_arc_apothem(arc);
-        incAngle = emb_arc_incAngle(arc);
-        clockwise = emb_arc_clockwise(arc);
-        /* bulge = emb_arc_bulge(arc); */
+        radius = emb_arc_radius(g);
+        diameter = emb_arc_diameter(g);
+        chordMid = emb_arc_chordMid(g);
+        sagitta = emb_arc_sagitta(g);
+        apothem = emb_arc_apothem(g);
+        incAngle = emb_arc_incAngle(g);
+        clockwise = emb_arc_clockwise(g);
+        /* bulge = emb_arc_bulge(g); */
         if (emb_verbose > 0) {
             fprintf(stdout, "Counter-Clockwise Test:\n");
-            printArcResults(bulge, arc, center,
+            printArcResults(bulge, g.object.arc, center,
                         radius, diameter, chord,
                         chordMid, sagitta,   apothem,
                         incAngle, clockwise);
@@ -4856,7 +4942,7 @@ create_test_file(int test_file, int format)
 		break;
 	}
 	case 2: {
-        EmbGeometry circle = emb_circle_init(10.0f, 1.0f, 5.0f);
+        EmbGeometry circle = emb_circle(10.0f, 1.0f, 5.0f);
         emb_array_add_geometry(p->geometry, circle);
         emb_pattern_convertGeometry(p);
 		break;
@@ -6267,22 +6353,20 @@ void
 emb_pattern_stitchRect(EmbPattern *p, EmbRect rect, int thread_index, int style)
 {
     EmbReal seperation = 0.1;
-    EmbReal width = rect.right - rect.left;
-    EmbReal height = rect.bottom - rect.top;
-    if (width > height) {
+    if (rect.w > rect.h) {
         float s;
-        for (s=rect.top; s<rect.bottom; s += seperation) {
+        for (s=rect.y; s<rect.y + rect.h; s += seperation) {
             /* Split long stitches here. */
-            emb_pattern_addStitchAbs(p, rect.top, s, NORMAL, thread_index);
-            emb_pattern_addStitchAbs(p, rect.bottom, s, NORMAL, thread_index);
+            emb_pattern_addStitchAbs(p, rect.y, s, NORMAL, thread_index);
+            emb_pattern_addStitchAbs(p, rect.y + rect.h, s, NORMAL, thread_index);
         }
     }
     else {
         float s;
-        for (s=rect.left; s<rect.right; s += seperation) {
+        for (s=rect.x; s<rect.x + rect.w; s += seperation) {
             /* Split long stitches here. */
-            emb_pattern_addStitchAbs(p, s, rect.left, NORMAL, thread_index);
-            emb_pattern_addStitchAbs(p, s, rect.right, NORMAL, thread_index);
+            emb_pattern_addStitchAbs(p, s, rect.x, NORMAL, thread_index);
+            emb_pattern_addStitchAbs(p, s, rect.x + rect.w, NORMAL, thread_index);
         }
     }
 }
@@ -6293,7 +6377,7 @@ void
 emb_pattern_stitchText(EmbPattern *p, EmbRect rect, int thread_index, int style)
 {
     printf("DEBUG: %f %f %d %d",
-        p->home.x, rect.top, thread_index, style);
+        p->home.x, rect.y, thread_index, style);
 }
 
 /* a p
@@ -6443,99 +6527,6 @@ emb_identify_format(const char *fileName)
         }
     }
     return -1;
-}
-
-/* TODO: Replace with embInt_read macros. */
-short
-fread_int16(void* f)
-{
-    short x;
-    emb_read(f, &x, EMB_INT16_LITTLE);
-    return x;
-}
-
-/* \todo replace with embInt_read
- */
-unsigned short
-fread_uint16(void* f)
-{
-    unsigned short x;
-    emb_read(f, &x, EMB_INT16_LITTLE);
-    return x;
-}
-
-/* . */
-void
-fpad(void* file, char c, int n)
-{
-    int i;
-    for (i = 0; i < n; i++) {
-        emb_fwrite(&c, 1, file);
-    }
-}
-
-/* \todo replace with embInt_read
- */
-void
-emb_write_i16(void* f, int16_t data)
-{
-    void *b = (void*)data;
-#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
-    reverse_byte_order(b, 2);
-#endif
-    emb_fwrite(b, 2, f);
-}
-
-/* \todo replace with embInt_read
- */
-void
-binaryWriteUShort(void* f, uint16_t data)
-{
-    void *b = (void*)data;
-#if EMB_LITTLE_ENDIAN != ENDIAN_HOST
-    reverse_byte_order(b, 2);
-#endif
-    emb_fwrite(b, 2, f);
-}
-
-/* \todo replace with embInt_read
- */
-void
-binaryWriteUShortBE(void* f, unsigned short data)
-{
-    emb_write(f, &data, EMB_INT16_BIG);
-}
-
-/* \todo replace with embInt_read
- */
-void
-binaryWriteInt(void* f, int data)
-{
-    emb_write(f, &data, EMB_INT32_LITTLE);
-}
-
-/* \todo replace with embInt_read
- */
-void
-binaryWriteIntBE(void* f, int data)
-{
-    emb_write(f, &data, EMB_INT32_BIG);
-}
-
-/* \todo replace with embInt_read
- */
-void
-emb_write_u32(void* f, unsigned int data)
-{
-    emb_write(f, &data, EMB_INT32_LITTLE);
-}
-
-/* \todo replace with embInt_read
- */
-void
-emb_write_u32be(void* f, unsigned int data)
-{
-    emb_write(f, &data, EMB_INT32_BIG);
 }
 
 /* . */
@@ -7833,12 +7824,12 @@ writeCsv(EmbPattern* pattern, void* file)
     fprintf(file,"\"#\",\"[VAR_NAME]\",\"[VAR_VALUE]\"\n");
     fprintf(file, "\">\",\"STITCH_COUNT:\",\"%u\"\n", (unsigned int)pattern->stitch_list->count);
     fprintf(file, "\">\",\"THREAD_COUNT:\",\"%u\"\n", (unsigned int)pattern->thread_list->count);
-    fprintf(file, "\">\",\"EXTENTS_LEFT:\",\"%f\"\n",   boundingRect.left);
-    fprintf(file, "\">\",\"EXTENTS_TOP:\",\"%f\"\n",    boundingRect.top);
-    fprintf(file, "\">\",\"EXTENTS_RIGHT:\",\"%f\"\n",  boundingRect.right);
-    fprintf(file, "\">\",\"EXTENTS_BOTTOM:\",\"%f\"\n", boundingRect.bottom);
-    fprintf(file, "\">\",\"EXTENTS_WIDTH:\",\"%f\"\n",  boundingRect.right - boundingRect.left);
-    fprintf(file, "\">\",\"EXTENTS_HEIGHT:\",\"%f\"\n", boundingRect.bottom - boundingRect.top);
+    fprintf(file, "\">\",\"EXTENTS_LEFT:\",\"%f\"\n", boundingRect.x);
+    fprintf(file, "\">\",\"EXTENTS_TOP:\",\"%f\"\n", boundingRect.y);
+    fprintf(file, "\">\",\"EXTENTS_RIGHT:\",\"%f\"\n", boundingRect.x + boundingRect.w);
+    fprintf(file, "\">\",\"EXTENTS_BOTTOM:\",\"%f\"\n", boundingRect.y + boundingRect.h);
+    fprintf(file, "\">\",\"EXTENTS_WIDTH:\",\"%f\"\n", boundingRect.w);
+    fprintf(file, "\">\",\"EXTENTS_HEIGHT:\",\"%f\"\n", boundingRect.h);
     fprintf(file,"\n");
 
     /* write colors */
@@ -7886,7 +7877,7 @@ readDat(EmbPattern* pattern, void* file)
         return 0;
     }
     emb_fseek(file, 0x02, SEEK_SET);
-    stitchesRemaining = fread_uint16(file);
+    stitchesRemaining = emb_read_u16(file);
     if (emb_verbose>1) {
         printf("stitchesRemaining: %d", stitchesRemaining);
     }
@@ -8398,10 +8389,10 @@ writeDst(EmbPattern* pattern, void* file)
         "-X:%5d\x0d"
         "+Y:%5d\x0d"
         "-Y:%5d\x0d",
-        (int)(boundingRect.right * 10.0),
-        (int)(fabs(boundingRect.left) * 10.0),
-        (int)(boundingRect.bottom * 10.0),
-        (int)(fabs(boundingRect.top) * 10.0));
+        (int)((boundingRect.x + boundingRect.w) * 10.0),
+        (int)(fabs(boundingRect.x) * 10.0),
+        (int)((boundingRect.y + boundingRect.h) * 10.0),
+        (int)(fabs(boundingRect.y) * 10.0));
 
     ax = ay = mx = my = 0;
     /* TODO: review the code below */
@@ -9441,22 +9432,22 @@ writeHus(EmbPattern* pattern, void* file)
     patternColor = minColors;
     if (minColors > 24) minColors = 24;
     code = 0x00C8AF5B;
-    emb_write(file, &code, EMB_INT32_LITTLE);
-    emb_write(file, &stitchCount, EMB_INT32_LITTLE);
-    emb_write(file, &minColors, EMB_INT32_LITTLE);
+    emb_write_i32(file, code);
+    emb_write_i32(file, stitchCount);
+    emb_write_i32(file, minColors);
 
     boundingRect = emb_pattern_calcBoundingBox(pattern);
-    right = (int16_t) emb_round(boundingRect.right * 10.0);
-    top = (int16_t) -emb_round(boundingRect.top * 10.0);
-    left = (int16_t) emb_round(boundingRect.left * 10.0);
-    bottom = (int16_t) -emb_round(boundingRect.bottom * 10.0);
-    emb_write(file, &right, EMB_INT16_LITTLE);
-    emb_write(file, &top, EMB_INT16_LITTLE);
-    emb_write(file, &left, EMB_INT16_LITTLE);
-    emb_write(file, &bottom, EMB_INT16_LITTLE);
+    right = (int16_t) emb_round((boundingRect.w + boundingRect.x) * 10.0);
+    top = (int16_t) -emb_round(boundingRect.y * 10.0);
+    left = (int16_t) emb_round(boundingRect.x * 10.0);
+    bottom = (int16_t) -emb_round((boundingRect.h + boundingRect.y) * 10.0);
+    emb_write_i16(file, right);
+    emb_write_i16(file, top);
+    emb_write_i16(file, left);
+    emb_write_i16(file, bottom);
 
     colors = 0x2A + 2 * minColors;
-    emb_write(file, &colors, EMB_INT32_LITTLE);
+    emb_write_i32(file, colors);
 
     xValues = (unsigned char*)malloc(sizeof(unsigned char)*(stitchCount));
     if (!xValues) {
@@ -9492,13 +9483,13 @@ writeHus(EmbPattern* pattern, void* file)
 
     offset1 = (unsigned int) (0x2A + 2 * patternColor + attributeSize);
     offset2 = (unsigned int) (0x2A + 2 * patternColor + attributeSize + xCompressedSize);
-    emb_write(file, &offset1, EMB_INT32_LITTLE);
-    emb_write(file, &offset2, EMB_INT32_LITTLE);
+    emb_write_i32(file, offset1);
+    emb_write_i32(file, offset2);
     fpad(file, 0, 10);
 
     for (i = 0; i < patternColor; i++) {
         short color_index = (int16_t)emb_find_nearest_thread(pattern->thread_list->thread[i].color, (EmbThread*)husThreads, 29);
-        emb_write(file, &color_index, EMB_INT16_LITTLE);
+        emb_write_i16(file, color_index);
     }
 
     emb_fwrite(attributeCompressed, attributeSize, file);
@@ -9537,13 +9528,13 @@ readInb(EmbPattern* pattern, void* file)
     emb_read(file, &stitchCount, EMB_INT32_LITTLE);
     emb_read(file, &width, EMB_INT16_LITTLE);
     emb_read(file, &height, EMB_INT16_LITTLE);
-    colorCount = fread_int16(file);
-    unknown3 = fread_int16(file);
-    unknown2 = fread_int16(file);
-    imageWidth = fread_int16(file);
-    imageHeight = fread_int16(file);
+    colorCount = emb_read_i16(file);
+    unknown3 = emb_read_i16(file);
+    unknown2 = emb_read_i16(file);
+    imageWidth = emb_read_i16(file);
+    imageHeight = emb_read_i16(file);
     emb_fread(bytesUnknown, 300, file); /* TODO: check return value */
-    nullbyte = fread_int16(file);
+    nullbyte = emb_read_i16(file);
     emb_read(file, &left, EMB_INT16_LITTLE);
     emb_read(file, &right, EMB_INT16_LITTLE);
     emb_read(file, &top, EMB_INT16_LITTLE);
@@ -9645,10 +9636,10 @@ writeInf(EmbPattern* pattern, void* file)
         record_length = 14 + string_len(buffer);
         record_number = i;
         needle_number = i;
-        emb_write(file, &record_length, EMB_INT16_BIG);
-        emb_write(file, &record_number, EMB_INT16_BIG);
+        emb_write_i16be(file, record_length);
+        emb_write_i16be(file, record_number);
         embColor_write(file, c, 3);
-        emb_write(file, &needle_number, EMB_INT16_BIG);
+        emb_write_i16be(file, needle_number);
         emb_fwrite("RGB\0", 4, file);
         fprintf(file, "%s", buffer);
         emb_fwrite("\0", 1, file);
@@ -9860,8 +9851,8 @@ writeJef(EmbPattern* pattern, void* file)
 
     colorlistSize = pattern->thread_list->count;
     minColors = EMB_MAX(colorlistSize, 6);
-    binaryWriteInt(file, 0x74 + (minColors * 4));
-    binaryWriteInt(file, 0x0A);
+    emb_write_i32(file, 0x74 + (minColors * 4));
+    emb_write_i32(file, 0x0A);
 
     embTime_initNow(&time);
 
@@ -9869,71 +9860,71 @@ writeJef(EmbPattern* pattern, void* file)
             (int)(time.month + 1), (int)(time.day), (int)(time.hour),
             (int)(time.minute), (int)(time.second));
     fpad(file, 0, 2);
-    emb_write(file, &(pattern->thread_list->count), EMB_INT32_LITTLE);
+    emb_write_i32(file, pattern->thread_list->count);
     data = pattern->stitch_list->count + EMB_MAX(0, (6 - colorlistSize) * 2) + 1;
-    emb_write(file, &data, EMB_INT32_LITTLE);
+    emb_write_i32(file, data);
 
     boundingRect = emb_pattern_calcBoundingBox(pattern);
-    width = boundingRect.right - boundingRect.left;
-    height = boundingRect.bottom - boundingRect.top;
+    width = boundingRect.w;
+    height = boundingRect.h;
     designWidth = (int)(width * 10.0);
     designHeight = (int)(height * 10.0);
 
-    binaryWriteInt(file, jefGetHoopSize(designWidth, designHeight));
+    emb_write_i32(file, jefGetHoopSize(designWidth, designHeight));
 
     /* Distance from center of Hoop */
-    binaryWriteInt(file, (int) (designWidth / 2));  /* left */
-    binaryWriteInt(file, (int) (designHeight / 2)); /* top */
-    binaryWriteInt(file, (int) (designWidth / 2));  /* right */
-    binaryWriteInt(file, (int) (designHeight / 2)); /* bottom */
+    emb_write_i32(file, (int) (designWidth / 2));  /* left */
+    emb_write_i32(file, (int) (designHeight / 2)); /* top */
+    emb_write_i32(file, (int) (designWidth / 2));  /* right */
+    emb_write_i32(file, (int) (designHeight / 2)); /* bottom */
 
     /* Distance from default 110 x 110 Hoop */
     if (EMB_MIN(550 - designWidth / 2, 550 - designHeight / 2) >= 0) {
-        binaryWriteInt(file, EMB_MAX(-1, 550 - designWidth / 2));  /* left */
-        binaryWriteInt(file, EMB_MAX(-1, 550 - designHeight / 2)); /* top */
-        binaryWriteInt(file, EMB_MAX(-1, 550 - designWidth / 2));  /* right */
-        binaryWriteInt(file, EMB_MAX(-1, 550 - designHeight / 2)); /* bottom */
+        emb_write_i32(file, EMB_MAX(-1, 550 - designWidth / 2));  /* left */
+        emb_write_i32(file, EMB_MAX(-1, 550 - designHeight / 2)); /* top */
+        emb_write_i32(file, EMB_MAX(-1, 550 - designWidth / 2));  /* right */
+        emb_write_i32(file, EMB_MAX(-1, 550 - designHeight / 2)); /* bottom */
     } else {
-        binaryWriteInt(file, -1);
-        binaryWriteInt(file, -1);
-        binaryWriteInt(file, -1);
-        binaryWriteInt(file, -1);
+        emb_write_i32(file, -1);
+        emb_write_i32(file, -1);
+        emb_write_i32(file, -1);
+        emb_write_i32(file, -1);
     }
 
     /* Distance from default 50 x 50 Hoop */
     if (EMB_MIN(250 - designWidth / 2, 250 - designHeight / 2) >= 0) {
-        binaryWriteInt(file, (int) EMB_MAX(-1, 250 - designWidth / 2));  /* left */
-        binaryWriteInt(file, (int) EMB_MAX(-1, 250 - designHeight / 2)); /* top */
-        binaryWriteInt(file, (int) EMB_MAX(-1, 250 - designWidth / 2));  /* right */
-        binaryWriteInt(file, (int) EMB_MAX(-1, 250 - designHeight / 2)); /* bottom */
+        emb_write_i32(file, (int) EMB_MAX(-1, 250 - designWidth / 2));  /* left */
+        emb_write_i32(file, (int) EMB_MAX(-1, 250 - designHeight / 2)); /* top */
+        emb_write_i32(file, (int) EMB_MAX(-1, 250 - designWidth / 2));  /* right */
+        emb_write_i32(file, (int) EMB_MAX(-1, 250 - designHeight / 2)); /* bottom */
     } else {
-        binaryWriteInt(file, -1);
-        binaryWriteInt(file, -1);
-        binaryWriteInt(file, -1);
-        binaryWriteInt(file, -1);
+        emb_write_i32(file, -1);
+        emb_write_i32(file, -1);
+        emb_write_i32(file, -1);
+        emb_write_i32(file, -1);
     }
 
     /* Distance from default 140 x 200 Hoop */
-    binaryWriteInt(file, (int) (700 - designWidth / 2));   /* left */
-    binaryWriteInt(file, (int) (1000 - designHeight / 2)); /* top */
-    binaryWriteInt(file, (int) (700 - designWidth / 2));   /* right */
-    binaryWriteInt(file, (int) (1000 - designHeight / 2)); /* bottom */
+    emb_write_i32(file, (int) (700 - designWidth / 2));   /* left */
+    emb_write_i32(file, (int) (1000 - designHeight / 2)); /* top */
+    emb_write_i32(file, (int) (700 - designWidth / 2));   /* right */
+    emb_write_i32(file, (int) (1000 - designHeight / 2)); /* bottom */
 
     /* repeated Distance from default 140 x 200 Hoop */
     /* TODO: Actually should be distance to custom hoop */
-    binaryWriteInt(file, (int) (630 - designWidth / 2));  /* left */
-    binaryWriteInt(file, (int) (550 - designHeight / 2)); /* top */
-    binaryWriteInt(file, (int) (630 - designWidth / 2));  /* right */
-    binaryWriteInt(file, (int) (550 - designHeight / 2)); /* bottom */
+    emb_write_i32(file, (int) (630 - designWidth / 2));  /* left */
+    emb_write_i32(file, (int) (550 - designHeight / 2)); /* top */
+    emb_write_i32(file, (int) (630 - designWidth / 2));  /* right */
+    emb_write_i32(file, (int) (550 - designHeight / 2)); /* bottom */
 
     for (i = 0; i < pattern->thread_list->count; i++) {
         int j = emb_find_nearest_thread(pattern->thread_list->thread[i].color, (EmbThread *)jefThreads, 79);
-        binaryWriteInt(file, j);
+        emb_write_i32(file, j);
     }
 
     for (i = 0; i < (minColors - colorlistSize); i++) {
         int a = 0x0D;
-        binaryWriteInt(file, a);
+        emb_write_i32(file, a);
     }
 
     pos.x = 0.0;
@@ -10238,8 +10229,8 @@ ofmReadClass(void* file)
         return 0;
     }
 
-    fread_int16(file);
-    len = fread_int16(file);
+    emb_read_i16(file);
+    len = emb_read_i16(file);
 
     emb_fread((unsigned char*)s, len, file);
     /* TODO: check return value */
@@ -10275,7 +10266,7 @@ ofmReadBlockHeader(void* file)
     emb_read(file, &unknown3, EMB_INT32_LITTLE);
 
     /* int v = emb_fread(&v, 3, file)?; TODO: review */
-    fread_int16(file);
+    emb_read_i16(file);
     emb_fseek(file, 1, SEEK_CUR);
     len = (char)fgetc(file);
     s = (char*)malloc(2 * len);
@@ -10327,10 +10318,10 @@ ofmReadThreads(void* file, EmbPattern* p)
     /* FF FE FF 00 */
     emb_fseek(file, 4, SEEK_CUR);
 
-    numberOfColors = fread_int16(file);
+    numberOfColors = emb_read_i16(file);
 
     emb_fseek(file, 4, SEEK_CUR);
-    stringLen = fread_int16(file);
+    stringLen = emb_read_i16(file);
     expandedString = (char*)malloc(stringLen);
     if (!expandedString) {
         printf("ERROR: format-ofm.c ofmReadThreads(), unable to allocate memory for expandedString\n");
@@ -10358,7 +10349,7 @@ ofmReadThreads(void* file, EmbPattern* p)
     }
     emb_fseek(file, 2, SEEK_CUR);
     primaryLibraryName = ofmReadLibrary(file);
-    numberOfLibraries = fread_int16(file);
+    numberOfLibraries = emb_read_i16(file);
 
     if (emb_verbose>1) {
         printf("primary library name: %s\n", primaryLibraryName);
@@ -10426,20 +10417,20 @@ readOfm(EmbPattern* pattern, void* fileCompound)
     ofmReadThreads(file, pattern);
     emb_fseek(file, 0x110, SEEK_CUR);
     emb_fseek(file, 0x4, SEEK_CUR); /* EMB_INT32_LITTLE */
-    classNameLength = fread_int16(file);
+    classNameLength = emb_read_i16(file);
     s = (char*)malloc(sizeof(char) * classNameLength);
     if (!s) {
         printf("ERROR: format-ofm.c readOfm(), unable to allocate memory for s\n");
         return 0;
     }
     emb_fread((unsigned char*)s, classNameLength, file); /* TODO: check return value */
-    unknownCount = fread_int16(file);
+    unknownCount = emb_read_i16(file);
     /* TODO: determine what unknown count represents */
     if (emb_verbose>1) {
         printf("unknownCount = %d\n", unknownCount);
     }
 
-    fread_int16(file);
+    emb_read_i16(file);
     key = ofmReadClass(file);
     while (1) {
         if (key == 0xFEFF) {
@@ -10451,7 +10442,7 @@ readOfm(EmbPattern* pattern, void* fileCompound)
         else {
             ofmReadColorChange(file, pattern);
         }
-        key = fread_uint16(file);
+        key = emb_read_u16(file);
         if (key == 0xFFFF) {
             ofmReadClass(file);
         }
@@ -10500,7 +10491,7 @@ readPcd(EmbPattern* pattern, const char *fileName, void* file)
      * 3 for PCS with large hoop (115x120)
      */
     hoopSize = (char)fgetc(file);
-    colorCount = fread_uint16(file);
+    colorCount = emb_read_u16(file);
     if (emb_verbose>1) {
         printf("version: %d\n", version);
         printf("hoop size: %d\n", hoopSize);
@@ -10520,7 +10511,7 @@ readPcd(EmbPattern* pattern, const char *fileName, void* file)
     if (allZeroColor) {
         emb_pattern_loadExternalColorFile(pattern, fileName);
     }
-    st = fread_uint16(file);
+    st = emb_read_u16(file);
     /* READ STITCH RECORDS */
     for (i = 0; i < st; i++) {
         int flags;
@@ -10549,7 +10540,7 @@ writePcd(EmbPattern* pattern, void* file)
 
     /* TODO: select hoop size defaulting to Large PCS hoop */
     emb_fwrite("2\x03", 2, file);
-    binaryWriteUShort(file, (unsigned short)pattern->thread_list->count);
+    emb_write_u16(file, (unsigned short)pattern->thread_list->count);
     for (i = 0; i < pattern->thread_list->count; i++) {
         EmbColor color = pattern->thread_list->thread[i].color;
         embColor_write(file, color, 4);
@@ -10558,7 +10549,7 @@ writePcd(EmbPattern* pattern, void* file)
     fpad(file, 0, 4*(16-i));
     /* write remaining colors to reach 16 */
 
-    binaryWriteUShort(file, (unsigned short)pattern->stitch_list->count);
+    emb_write_u16(file, (unsigned short)pattern->stitch_list->count);
     /* write stitches */
     for (i = 0; i < pattern->stitch_list->count; i++) {
         EmbStitch st = pattern->stitch_list->stitch[i];
@@ -10645,7 +10636,7 @@ readPcq(EmbPattern* pattern, const char* fileName, void* file)
      * 2 for PCS with small hoop(80x80)
      * 3 for PCS with large hoop (115x120)
      */
-    colorCount = fread_uint16(file);
+    colorCount = emb_read_u16(file);
     if (emb_verbose>1) {
         printf("version: %d\n", version);
         printf("hoop size: %d\n", hoopSize);
@@ -10665,7 +10656,7 @@ readPcq(EmbPattern* pattern, const char* fileName, void* file)
     if (allZeroColor) {
         emb_pattern_loadExternalColorFile(pattern, fileName);
     }
-    st = fread_uint16(file);
+    st = emb_read_u16(file);
     /* READ STITCH RECORDS */
     for (i = 0; i < st; i++) {
         flags = NORMAL;
@@ -10696,7 +10687,7 @@ writePcq(EmbPattern* pattern, void* file)
 
     /* TODO: select hoop size defaulting to Large PCS hoop */
     emb_fwrite("2\x03", 2, file);
-    binaryWriteUShort(file, (unsigned short)pattern->thread_list->count);
+    emb_write_u16(file, (unsigned short)pattern->thread_list->count);
     for (i = 0; i < pattern->thread_list->count; i++) {
         EmbColor color = pattern->thread_list->thread[i].color;
         embColor_write(file, color, 4);
@@ -10705,7 +10696,7 @@ writePcq(EmbPattern* pattern, void* file)
     /* write remaining colors to reach 16 */
     fpad(file, 0, (16-i)*4);
 
-    binaryWriteUShort(file, (unsigned short)pattern->stitch_list->count);
+    emb_write_u16(file, (unsigned short)pattern->stitch_list->count);
     /* write stitches */
     for (i = 0; i < pattern->stitch_list->count; i++) {
         EmbStitch st = pattern->stitch_list->stitch[i];
@@ -10749,7 +10740,7 @@ readPcs(EmbPattern* pattern, const char* fileName, void* file)
             break;
     }
 
-    colorCount = fread_uint16(file);
+    colorCount = emb_read_u16(file);
     if (emb_verbose>1) {
         printf("version: %d\n", version);
         printf("hoop size: %d\n", hoopSize);
@@ -10769,7 +10760,7 @@ readPcs(EmbPattern* pattern, const char* fileName, void* file)
     if (allZeroColor) {
         emb_pattern_loadExternalColorFile(pattern, fileName);
     }
-    st = fread_uint16(file);
+    st = emb_read_u16(file);
     /* READ STITCH RECORDS */
     for (i = 0; i < st; i++) {
         flags = NORMAL;
@@ -10800,7 +10791,7 @@ writePcs(EmbPattern* pattern, void* file)
 
     /* TODO: select hoop size defaulting to Large PCS hoop */
     emb_fwrite("2\x03", 2, file);
-    binaryWriteUShort(file, (unsigned short)pattern->thread_list->count);
+    emb_write_u16(file, (unsigned short)pattern->thread_list->count);
     for (i = 0; i < pattern->thread_list->count; i++) {
         EmbColor color = pattern->thread_list->thread[i].color;
         embColor_write(file, color, 4);
@@ -10809,7 +10800,7 @@ writePcs(EmbPattern* pattern, void* file)
     /* write remaining colors to reach 16 */
     /* fpad(file, 0, 4*(16-i)); */
 
-    binaryWriteUShort(file, (unsigned short)pattern->stitch_list->count);
+    emb_write_u16(file, (unsigned short)pattern->stitch_list->count);
     /* write stitches */
     for (i = 0; i < pattern->stitch_list->count; i++) {
         EmbStitch st = pattern->stitch_list->stitch[i];
@@ -10946,13 +10937,13 @@ readPec(EmbPattern* pattern, const char *fileName, void* file)
     (void)(char)fgetc(file); /* 0xF0 */
     /* Get X and Y size in .1 mm */
     /* 0x210 */
-    fread_int16(file); /* x size */
-    fread_int16(file); /* y size */
+    emb_read_i16(file); /* x size */
+    emb_read_i16(file); /* y size */
 
-    fread_int16(file); /* 0x01E0 */
-    fread_int16(file); /* 0x01B0 */
-    fread_int16(file); /* distance left from start */
-    fread_int16(file); /* distance up from start */
+    emb_read_i16(file); /* 0x01E0 */
+    emb_read_i16(file); /* 0x01B0 */
+    emb_read_i16(file); /* distance left from start */
+    emb_read_i16(file); /* distance up from start */
 
     /* Begin Stitch Data */
     /* 0x21C */
@@ -11077,21 +11068,21 @@ writePecStitches(EmbPattern* pattern, void* file, const char *fileName)
 
     bounds = emb_pattern_calcBoundingBox(pattern);
 
-    height = (int)emb_round(bounds.bottom - bounds.top);
-    width = (int)emb_round(bounds.right - bounds.left);
-    unsigned short top = (unsigned short)(0x9000 | -(int)emb_round(bounds.left));
-    unsigned short bottom = (unsigned short)(0x9000 | -(int)emb_round(bounds.top));
+    height = (int)emb_round(bounds.h);
+    width = (int)emb_round(bounds.w);
+    unsigned short top = (unsigned short)(0x9000 | -(int)emb_round(bounds.x));
+    unsigned short bottom = (unsigned short)(0x9000 | -(int)emb_round(bounds.y));
     /* write 2 byte x size */
-    emb_write(file, &width, EMB_INT16_LITTLE);
+    emb_write_i16(file, width);
     /* write 2 byte y size */
-    emb_write(file, &height, EMB_INT16_LITTLE);
+    emb_write_i16(file, height);
 
     /* Write 4 miscellaneous int16's */
     emb_fwrite("\x01\xe0\x01\xb0", 4, file);
 
     /* CHECK: is this really big endian? */
-    emb_write(file, &top, EMB_INT16_BIG);
-    emb_write(file, &bottom, EMB_INT16_BIG);
+    emb_write_i16be(file, top);
+    emb_write_i16be(file, bottom);
 
     pecEncode(file, pattern);
     graphicsOffsetValue = ftell(file) - graphicsOffsetLocation + 2;
@@ -11110,8 +11101,8 @@ writePecStitches(EmbPattern* pattern, void* file, const char *fileName)
     xFactor = 42.0 / width;
     for (i = 0; i < pattern->stitch_list->count; i++) {
         EmbStitch st = pattern->stitch_list->stitch[i];
-        int x = (int)emb_round((st.x - bounds.left) * xFactor) + 3;
-        int y = (int)emb_round((st.y - bounds.top) * yFactor) + 3;
+        int x = (int)emb_round((st.x - bounds.x) * xFactor) + 3;
+        int y = (int)emb_round((st.y - bounds.y) * yFactor) + 3;
         if (x<=0 || x>48) continue;
         if (y<=0 || y>38) continue;
         image[y][x] = 1;
@@ -11124,8 +11115,8 @@ writePecStitches(EmbPattern* pattern, void* file, const char *fileName)
         memory_copy(image, imageWithFrame, 48*38);
         for (; j < pattern->stitch_list->count; j++) {
             EmbStitch st = pattern->stitch_list->stitch[j];
-            int x = (int)emb_round((st.x - bounds.left) * xFactor) + 3;
-            int y = (int)emb_round((st.y - bounds.top) * yFactor) + 3;
+            int x = (int)emb_round((st.x - bounds.x) * xFactor) + 3;
+            int y = (int)emb_round((st.y - bounds.y) * yFactor) + 3;
             if (x<=0 || x>48) continue;
             if (y<=0 || y>38) continue;
             if (st.flags & STOP) {
@@ -11446,7 +11437,7 @@ readProgrammableFills(void* file, EmbPattern* pattern)
     if (emb_verbose > 1) {
         printf("Called with: (%p, %p)", (void*)file, (void*)pattern);
     }
-    numberOfProgrammableFillPatterns = fread_int16(file);
+    numberOfProgrammableFillPatterns = emb_read_i16(file);
     if (numberOfProgrammableFillPatterns != 0) {
         return;
     }
@@ -11459,7 +11450,7 @@ readMotifPatterns(void* file, EmbPattern* pattern)
     if (emb_verbose > 1) {
         printf("Called with: (%p, %p)", (void*)file, (void*)pattern);
     }
-    numberOfMotifPatterns = fread_int16(file);
+    numberOfMotifPatterns = emb_read_i16(file);
     if (numberOfMotifPatterns != 0) {
         return;
     }
@@ -11472,7 +11463,7 @@ readFeatherPatterns(void* file, EmbPattern* pattern)
     if (emb_verbose > 1) {
         printf("Called with: (%p, %p)", (void*)file, (void*)pattern);
     }
-    featherPatternCount = fread_int16(file);
+    featherPatternCount = emb_read_i16(file);
     if (featherPatternCount != 0) {
         return;
     }
@@ -11485,7 +11476,7 @@ readThreads(void* file, EmbPattern* pattern)
     if (emb_verbose > 1) {
         printf("Called with: (%p, %p)", (void*)file, (void*)pattern);
     }
-    numberOfColors = fread_int16(file);
+    numberOfColors = emb_read_i16(file);
     for (i=0; i<numberOfColors; i++) {
         EmbThread thread;
         int color_code_length;
@@ -11557,7 +11548,7 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
     }
 
     emb_write_i16(file, (int16_t)blockCount); /* block count */
-    binaryWriteUShort(file, 0xFFFF);
+    emb_write_u16(file, 0xFFFF);
     emb_write_i16(file, 0x00);
 
     emb_write_i16(file, 0x07); /* string length */
@@ -11607,11 +11598,11 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
         j = i;
         while (j < pattern->stitch_list->count && (flag == st.flags)) {
             st = pattern->stitch_list->stitch[j];
-            emb_write_i16(file, (int16_t)(st.x - bounds.left));
-            emb_write_i16(file, (int16_t)(st.y + bounds.top));
+            emb_write_i16(file, (int16_t)(st.x - bounds.x));
+            emb_write_i16(file, (int16_t)(st.y + bounds.y));
         }
         if (j < pattern->stitch_list->count ) {
-            binaryWriteUShort(file, 0x8003);
+            emb_write_u16(file, 0x8003);
         }
         blockCount++;
         i = j;
@@ -11621,7 +11612,7 @@ pesWriteSewSegSection(EmbPattern* pattern, void* file) {
         emb_write_i16(file, colorInfo[i * 2]);
         emb_write_i16(file, colorInfo[i * 2 + 1]);
     }
-    binaryWriteInt(file, 0);
+    emb_write_i32(file, 0);
     safe_free(colorInfo);
 }
 
@@ -11639,25 +11630,23 @@ pesWriteEmbOneSection(EmbPattern* pattern, void* file) {
 
     /* AffineTransform */
     x = 1.0;
-    emb_write(file, &x, EMB_INT32_LITTLE);
+    emb_write_i32(file, x);
     x = 0.0;
-    emb_write(file, &x, EMB_INT32_LITTLE);
+    emb_write_i32(file, x);
     x = 0.0;
-    emb_write(file, &x, EMB_INT32_LITTLE);
+    emb_write_i32(file, x);
     x = 1.0;
-    emb_write(file, &x, EMB_INT32_LITTLE);
-    width = bounds.right - bounds.left;
-    height = bounds.bottom - bounds.top;
-    x = (float)((width - hoopWidth) / 2);
-    emb_write(file, &x, EMB_INT32_LITTLE);
-    x = (float)((height + hoopHeight) / 2);
-    emb_write(file, &x, EMB_INT32_LITTLE);
+    emb_write_i32(file, x);
+    x = (float)((bounds.w - hoopWidth) / 2);
+    emb_write_i32(file, x);
+    x = (float)((bounds.h + hoopHeight) / 2);
+    emb_write_i32(file, x);
 
     emb_write_i16(file, 1);
     emb_write_i16(file, 0); /* Translate X */
     emb_write_i16(file, 0); /* Translate Y */
-    emb_write_i16(file, (int16_t)width);
-    emb_write_i16(file, (int16_t)height);
+    emb_write_i16(file, (int16_t)bounds.w);
+    emb_write_i16(file, (int16_t)bounds.h);
 
     fpad(file, 0, 8);
     /*WriteSubObjects(br, pes, SubBlocks); */
@@ -11671,14 +11660,14 @@ writePes(EmbPattern* pattern,  const char *fileName, void* file)
     emb_pattern_scale(pattern, 10.0);
     emb_fwrite("#PES0001", 8, file);
     /* WRITE PECPointer 32 bit int */
-    binaryWriteInt(file, 0x00);
+    emb_write_i32(file, 0x00);
 
     emb_write_i16(file, 0x01);
     emb_write_i16(file, 0x01);
 
     /* Write object count */
     emb_write_i16(file, 0x01);
-    binaryWriteUShort(file, 0xFFFF); /* command */
+    emb_write_u16(file, 0xFFFF); /* command */
     emb_write_i16(file, 0x00); /* unknown */
 
     pesWriteEmbOneSection(pattern, file);
@@ -11707,7 +11696,7 @@ readPhb(EmbPattern* pattern, void* file)
     int i;
 
     emb_fseek(file, 0x71, SEEK_SET);
-    colorCount = fread_int16(file);
+    colorCount = emb_read_i16(file);
 
     for (i = 0; i < colorCount; i++) {
         EmbThread t = pecThreads[fgetc(file)];
@@ -11774,7 +11763,7 @@ readPhc(EmbPattern* pattern, void* file)
     emb_fseek(file, 0x07, SEEK_SET);
     version = (char)fgetc(file) - 0x30; /* converting from ansi number */
     emb_fseek(file, 0x4D, SEEK_SET);
-    colorChanges = fread_uint16(file);
+    colorChanges = emb_read_u16(file);
 
     for (i = 0; i < colorChanges; i++) {
         EmbThread t = pecThreads[(int)(char)fgetc(file)];
@@ -11783,13 +11772,13 @@ readPhc(EmbPattern* pattern, void* file)
     emb_fseek(file, 0x2B, SEEK_SET);
     pecAdd = (char)fgetc(file);
     emb_read(file, &fileLength, EMB_INT32_LITTLE);
-    pecOffset = fread_uint16(file);
+    pecOffset = emb_read_u16(file);
     emb_fseek(file, pecOffset + pecAdd, SEEK_SET);
-    bytesInSection = fread_uint16(file);
+    bytesInSection = emb_read_u16(file);
     emb_fseek(file, bytesInSection, SEEK_CUR);
     emb_read(file, &bytesInSection2, EMB_INT32_LITTLE);
     emb_fseek(file, bytesInSection2, SEEK_CUR);
-    bytesInSection3 = fread_uint16(file);
+    bytesInSection3 = emb_read_u16(file);
     emb_fseek(file, bytesInSection3 + 0x12, SEEK_CUR);
 
     if (emb_verbose>1) {
@@ -11944,7 +11933,7 @@ readSew(EmbPattern* pattern, void* file)
 
 
     for (i = 0; i < numberOfColors; i++) {
-        int color = fread_int16(file);
+        int color = emb_read_i16(file);
         emb_pattern_addThread(pattern, jefThreads[color%78]);
     }
     emb_fseek(file, 0x1D78, SEEK_SET);
@@ -12100,13 +12089,13 @@ readShv(EmbPattern* pattern, void* file)
         emb_fseek(file, (designHeight*designWidth)/2, SEEK_CUR);
     }
     numberOfColors = fgetc(file);
-    magicCode = fread_uint16(file);
+    magicCode = emb_read_u16(file);
     emb_fseek(file, 1, SEEK_CUR);
     emb_read(file, &something, EMB_INT32_LITTLE);
-    left = fread_int16(file);
-    top = fread_int16(file);
-    right = fread_int16(file);
-    bottom = fread_int16(file);
+    left = emb_read_i16(file);
+    top = emb_read_i16(file);
+    right = emb_read_i16(file);
+    bottom = emb_read_i16(file);
 
     something2 = (char)fgetc(file);
     numberOfSections = fgetc(file);
@@ -12303,7 +12292,7 @@ stxReadThread(StxThread* thread, void* file)
     emb_read(file, &somethingSomething, EMB_INT32_LITTLE);
     emb_read(file, &somethingSomething2, EMB_INT32_LITTLE);
     emb_read(file, &somethingElse, EMB_INT32_LITTLE);
-    numberOfOtherDescriptors = fread_int16(file);
+    numberOfOtherDescriptors = emb_read_i16(file);
     if (emb_verbose>1) {
         printf("somethingSomething: %d", somethingSomething);
         printf("somethingSomething2: %d", somethingSomething2);
@@ -12321,7 +12310,7 @@ stxReadThread(StxThread* thread, void* file)
         char* subCodeBuff, *subColorNameBuff;
         int subCodeLength, subColorNameLength;
 
-        sd.someNum = fread_int16(file);
+        sd.someNum = emb_read_i16(file);
         /* Debug.Assert(sd.someNum == 1); TODO: review */
         emb_read(file, &(sd.someInt), EMB_INT32_LITTLE);
         subCodeLength = fgetc(file);
@@ -12420,7 +12409,7 @@ readStx(EmbPattern* pattern, void* file)
     /*Stream s2 = new MemoryStream(gif); TODO: review */
     /*Image = new Bitmap(s2); TODO: review */
 
-    threadCount = fread_int16(file);
+    threadCount = emb_read_i16(file);
     stxThreads = (StxThread*)malloc(sizeof(StxThread) * threadCount);
     if (!stxThreads) {
         printf("ERROR: format-stx.c readStx(), unable ");
@@ -13081,12 +13070,12 @@ parse_rect(EmbPattern *p)
 {
     EmbRect rect;
     float width, height;
-    rect.left = atof(svgAttribute_getValue("x"));
-    rect.top = atof(svgAttribute_getValue("y"));
+    rect.x = atof(svgAttribute_getValue("x"));
+    rect.y = atof(svgAttribute_getValue("y"));
     width = atof(svgAttribute_getValue("width"));
     height = atof(svgAttribute_getValue("height"));
-    rect.right = rect.left + width;
-    rect.bottom = rect.top + height;
+    rect.right = rect.x + width;
+    rect.bottom = rect.y + height;
     emb_pattern_addRectAbs(p, rect);
 }
 
@@ -13396,9 +13385,7 @@ readSvg(EmbPattern* pattern, void* file) {
         if (pattern->rects) {
             for (i = 0; i < pattern->rects->count; i++) {
                 EmbRect r = pattern->rects->rect[i];
-                EmbReal width = r.right - r.left;
-                EmbReal height = r.bottom - r.top;
-                printf("rect %f %f %f %f\n", r.left, r.top, width, height);
+                printf("rect %f %f %f %f\n", r.x, r.y, r.w, r.h);
             }
         }
     }
@@ -13440,19 +13427,17 @@ writeSvg(EmbPattern* pattern, void *file)
 
     /* Add a margin of 10%. */
     border = boundingRect;
-    border.left *= 10.0;
-    border.right *= 10.0;
-    border.top *= 10.0;
-    border.bottom *= 10.0;
-    border.left -= 0.1*(border.right - border.left);
-    border.right += 0.1*(border.right - border.left);
-    border.top -= 0.1*(border.bottom - border.top);
-    border.bottom += 0.1*(border.bottom - border.top);
+    border.x *= 10.0;
+    border.y *= 10.0;
+    border.w *= 10.0;
+    border.h *= 10.0;
+    border.x -= 0.1 * border.w;
+    border.w += 0.2 * border.w;
+    border.y -= 0.1 * border.h;
+    border.h += 0.2 * border.h;
     /* Sanity check here? */
     fprintf(file, "viewBox=\"%f %f %f %f\" ",
-            border.left, border.top,
-            border.right - border.left,
-            border.bottom - border.top);
+            border.x, border.y, border.w, border.h);
 
     fprintf(file, "xmlns=\"http://www.w3.org/2000/svg\" version=\"1.2\" baseProfile=\"tiny\">");
     fprintf(file, "\n<g transform=\"scale(10)\">");
@@ -13563,9 +13548,7 @@ writeSvg(EmbPattern* pattern, void *file)
              */
             fprintf(file, "\n<rect stroke-width=\"0.2\" stroke=\"#%02x%02x%02x\" fill=\"none\" x=\"%f\" y=\"%f\" width=\"%f\" height=\"%f\" />",
                 color.r, color.g, color.b,
-                rect.left, rect.top,
-                rect.right - rect.left,
-                rect.bottom - rect.top);
+                rect.x, rect.y, rect.w, rect.h);
             break;
         }
         default:
@@ -13645,7 +13628,7 @@ writeT01(EmbPattern* pattern, void* file)
 
     boundingRect = emb_pattern_calcBoundingBox(pattern);
     if (emb_verbose>1) {
-        printf("bounding rectangle with top %f not used ", boundingRect.top);
+        printf("bounding rectangle with top %f not used ", boundingRect.x);
         printf("in the function writeT01\n");
     }
     pos.x = 0.0;
@@ -13860,9 +13843,9 @@ readThr(EmbPattern* pattern, void* file)
     emb_read(file, &(header.sigVersion), EMB_INT32_LITTLE);
     emb_read(file, &(header.length), EMB_INT32_LITTLE);
     emb_read(file, &(header.numStiches), EMB_INT16_LITTLE);
-    header.hoopSize    = fread_uint16(file);
+    header.hoopSize    = emb_read_u16(file);
     for (i=0; i<7; i++) {
-        header.reserved[i] = fread_uint16(file);
+        header.reserved[i] = emb_read_u16(file);
     }
 
     if ((header.sigVersion & 0xffffff) == 0x746872) {
@@ -13937,10 +13920,10 @@ writeThr(EmbPattern* pattern, void* file)
 
     emb_write_u32(file, header.sigVersion);
     emb_write_u32(file, header.length);
-    binaryWriteUShort(file, header.numStiches);
-    binaryWriteUShort(file, header.hoopSize);
+    emb_write_u16(file, header.numStiches);
+    emb_write_u16(file, header.hoopSize);
     for (i=0; i<7; i++) {
-        binaryWriteUShort(file, header.reserved[i]);
+        emb_write_u16(file, header.reserved[i]);
     }
 
     if (version == 1 || version == 2) {
@@ -13949,9 +13932,9 @@ writeThr(EmbPattern* pattern, void* file)
         extension.hoopX = 640;
         extension.hoopY = 640;
 
-        emb_write(file, &(extension.hoopX), EMB_INT32_LITTLE);
-        emb_write(file, &(extension.hoopY), EMB_INT32_LITTLE);
-        emb_write(file, &(extension.stitchGranularity), EMB_INT32_LITTLE);
+        emb_write_i32(file, extension.hoopX);
+        emb_write_i32(file, extension.hoopY);
+        emb_write_i32(file, extension.stitchGranularity);
         emb_fwrite(extension.creatorName, 50, file);
         emb_fwrite(extension.modifierName, 50, file);
         fputc(extension.auxFormat, file);
@@ -13965,8 +13948,8 @@ writeThr(EmbPattern* pattern, void* file)
         float x, y;
         x = (float)(st.x * 10.0);
         y = (float)(st.y * 10.0);
-        emb_write(file, &x, EMB_INT32_LITTLE);
-        emb_write(file, &y, EMB_INT32_LITTLE);
+        emb_write_i32(file, x);
+        emb_write_i32(file, y);
         emb_write_u32(file, NOTFRM | (st.color & 0x0F));
     }
     emb_fwrite(bitmapName, 16, file);
@@ -14427,10 +14410,10 @@ writeVip(EmbPattern* pattern, void* file)
     emb_write_u32(file, minColors);
 
     boundingRect = emb_pattern_calcBoundingBox(pattern);
-    emb_write_i16(file, (int16_t) emb_round(boundingRect.right * 10.0));
-    emb_write_i16(file, (int16_t) -emb_round(boundingRect.top * 10.0 - 1.0));
-    emb_write_i16(file, (int16_t) emb_round(boundingRect.left * 10.0));
-    emb_write_i16(file, (int16_t) -emb_round(boundingRect.bottom * 10.0 - 1.0));
+    emb_write_i16(file, (int16_t) emb_round((boundingRect.x+boundingRect.w) * 10.0));
+    emb_write_i16(file, (int16_t) -emb_round(boundingRect.y * 10.0 - 1.0));
+    emb_write_i16(file, (int16_t) emb_round(boundingRect.x * 10.0));
+    emb_write_i16(file, (int16_t) -emb_round((boundingRect.y+boundingRect.h) * 10.0 - 1.0));
 
     emb_write_u32(file, 0x38 + (minColors << 3));
 
@@ -14458,9 +14441,9 @@ writeVip(EmbPattern* pattern, void* file)
         emb_write_u32(file, (unsigned int) (0x38 + (minColors << 3) + attributeSize + xCompressedSize));
         emb_write_u32(file, 0x00000000);
         emb_write_u32(file, 0x00000000);
-        binaryWriteUShort(file, 0x0000);
+        emb_write_u16(file, 0x0000);
 
-        binaryWriteInt(file, minColors << 2);
+        emb_write_i32(file, minColors << 2);
 
         for (i = 0; i < minColors; i++) {
             int byteChunk = i << 2;
@@ -14477,7 +14460,7 @@ writeVip(EmbPattern* pattern, void* file)
             fputc(prevByte, file);
         }
         for (i = 0; i <= minColors; i++) {
-            binaryWriteInt(file, 1);
+            emb_write_i32(file, 1);
         }
         emb_write_u32(file, 0); /* string length */
         emb_write_i16(file, 0);
@@ -14755,7 +14738,7 @@ readVp3(EmbPattern* pattern, void* file)
 void
 vp3WriteStringLen(void* file, const char* str, int len)
 {
-    binaryWriteUShortBE(file, len);
+    emb_write_u16BE(file, len);
     emb_fwrite(str, len, file);
 }
 
@@ -14771,7 +14754,7 @@ vp3PatchByteCount(void* file, int offset, int adjustment)
     int currentPos = ftell(file);
     emb_fseek(file, offset, SEEK_SET);
     printf("Patching byte count: %d\n", currentPos - offset + adjustment);
-    binaryWriteIntBE(file, currentPos - offset + adjustment);
+    emb_write_i32be(file, currentPos - offset + adjustment);
     emb_fseek(file, currentPos, SEEK_SET);
 }
 
@@ -14798,13 +14781,13 @@ writeVp3(EmbPattern* pattern, void* file)
     emb_fwrite("\x00\x02\x00", 3, file);
 
     remainingBytesPos = ftell(file);
-    binaryWriteInt(file, 0); /* placeholder */
+    emb_write_i32(file, 0); /* placeholder */
     vp3WriteString(file, "");
-    binaryWriteIntBE(file, bounds.right * 1000);
-    binaryWriteIntBE(file, bounds.bottom * 1000);
-    binaryWriteIntBE(file, bounds.left * 1000);
-    binaryWriteIntBE(file, bounds.top * 1000);
-    binaryWriteInt(file, 0); /* this would be some (unknown) function of thread length */
+    emb_write_i32be(file, (bounds.x + bounds.w) * 1000);
+    emb_write_i32be(file, (bounds.y + bounds.h) * 1000);
+    emb_write_i32be(file, bounds.x * 1000);
+    emb_write_i32be(file, bounds.y * 1000);
+    emb_write_i32(file, 0); /* this would be some (unknown) function of thread length */
     fputc(0, file);
 
     numberOfColors = emb_pattern_color_count(pattern, color);
@@ -14812,34 +14795,30 @@ writeVp3(EmbPattern* pattern, void* file)
     emb_fwrite("\x0C\x00\x01\x00\x03\x00", 6, file);
 
     remainingBytesPos2 = ftell(file);
-    binaryWriteInt(file, 0); /* placeholder */
+    emb_write_i32(file, 0); /* placeholder */
 
-    binaryWriteIntBE(file, 0); /* origin X */
-    binaryWriteIntBE(file, 0); /* origin Y */
+    emb_write_i32be(file, 0); /* origin X */
+    emb_write_i32be(file, 0); /* origin Y */
     fpad(file, 0, 3);
 
-    binaryWriteIntBE(file, bounds.right * 1000);
-    binaryWriteIntBE(file, bounds.bottom * 1000);
-    binaryWriteIntBE(file, bounds.left * 1000);
-    binaryWriteIntBE(file, bounds.top * 1000);
+    emb_write_i32be(file, (bounds.x + bounds.w) * 1000);
+    emb_write_i32be(file, (bounds.y + bounds.h) * 1000);
+    emb_write_i32be(file, bounds.x * 1000);
+    emb_write_i32be(file, bounds.y * 1000);
 
-    binaryWriteIntBE(file, (bounds.right - bounds.left) * 1000);
-    binaryWriteIntBE(file, (bounds.bottom - bounds.top) * 1000);
+    emb_write_i32be(file, bounds.w * 1000);
+    emb_write_i32be(file, bounds.h * 1000);
 
     vp3WriteString(file, "");
-    a = 25700;
-    emb_write(file, &a, EMB_INT16_BIG);
-    a_int = 4096;
-    emb_write(file, &a_int, EMB_INT32_BIG);
-    a_int = 0;
-    emb_write(file, &a_int, EMB_INT32_BIG);
-    emb_write(file, &a_int, EMB_INT32_BIG);
-    a_int = 4096;
-    emb_write(file, &a_int, EMB_INT32_BIG);
+    emb_write_i16be(file, 25700);
+    emb_write_i32be(file, 4096);
+    emb_write_i32be(file, 0);
+    emb_write_i32be(file, 0);
+    emb_write_i32be(file, 4096);
 
     emb_fwrite("xxPP\x01\0", 6, file);
     vp3WriteString(file, "");
-    emb_write(file, &numberOfColors, EMB_INT16_BIG);
+    emb_write_i16be(file, numberOfColors);
 
     for (i=0; i<pattern->stitch_list->count; i++) {
         char colorName[8] = { 0 };
@@ -14862,7 +14841,7 @@ writeVp3(EmbPattern* pattern, void* file)
         fputc(0, file);
 
         colorSectionLengthPos = ftell(file);
-        binaryWriteInt(file, 0); /* placeholder */
+        emb_write_i32(file, 0); /* placeholder */
 
         /*
         pointer = mainPointer;
@@ -14878,8 +14857,8 @@ writeVp3(EmbPattern* pattern, void* file)
             printf("%d\n", j);
             printf("format-vp3.c DEBUG %d, %f, %f\n", s.flags, s.x, s.y);
         }
-        binaryWriteIntBE(file, s.x * 1000);
-        binaryWriteIntBE(file, -s.y * 1000);
+        emb_write_i32be(file, s.x * 1000);
+        emb_write_i32be(file, -s.y * 1000);
         /* pointer = pointer->next; */
 
         first = 0;
@@ -14906,13 +14885,13 @@ writeVp3(EmbPattern* pattern, void* file)
         vp3WriteString(file, colorName);
         vp3WriteString(file, "");
 
-        binaryWriteIntBE(file, 0);
-        binaryWriteIntBE(file, 0);
+        emb_write_i32be(file, 0);
+        emb_write_i32be(file, 0);
 
         vp3WriteStringLen(file, "\0", 1);
 
         colorSectionStitchBytes = ftell(file);
-        binaryWriteInt(file, 0); /* placeholder */
+        emb_write_i32(file, 0); /* placeholder */
 
         fputc(10, file);
         fputc(246, file);
@@ -14939,8 +14918,8 @@ writeVp3(EmbPattern* pattern, void* file)
             if (dx < -127 || dx > 127 || dy < -127 || dy > 127) {
                 fputc(128, file);
                 fputc(1, file);
-                emb_write(file, &dx, EMB_INT16_BIG);
-                emb_write(file, &dy, EMB_INT16_BIG);
+                emb_write_i16be(file, dx);
+                emb_write_i16be(file, dy);
                 fputc(128, file);
                 fputc(2, file);
             }
@@ -15021,7 +15000,7 @@ readXxx(EmbPattern* pattern, void* file)
         if (b0 == 0x7E || b0 == 0x7D) {
             dx = b1 + ((char)fgetc(file) << 8);
             dx = ((int16_t) dx);
-            dy = fread_int16(file);
+            dy = emb_read_i16(file);
             flags = TRIM;
         } else if (b0 == 0x7F) {
             /* TODO: LOOKS LIKE THESE CODES ARE IN THE HEADER */
@@ -15114,18 +15093,16 @@ writeXxx(EmbPattern* pattern, void* file)
     emb_pattern_correctForMaxStitchLength(pattern, 124, 127);
 
     fpad(file, 0, 0x17);
-    n_stitches = (unsigned int)pattern->stitch_list->count;
-    emb_write(file, &n_stitches, EMB_INT32_LITTLE);
+    emb_write_i32(file, (unsigned int)pattern->stitch_list->count);
 
     fpad(file, 0, 0x0C);
-    n_threads = (unsigned short)pattern->thread_list->count;
-    emb_write(file, &n_threads, EMB_INT16_LITTLE);
+    emb_write_i16(file, (unsigned short)pattern->thread_list->count);
 
     fpad(file, 0, 0x02);
 
     rect = emb_pattern_calcBoundingBox(pattern);
-    width = rect.right - rect.left;
-    height = rect.bottom - rect.top;
+    width = rect.w;
+    height = rect.h;
     emb_write_i16(file, (int16_t)(width * 10.0));
     emb_write_i16(file, (int16_t)(height * 10.0));
 
@@ -15141,7 +15118,7 @@ writeXxx(EmbPattern* pattern, void* file)
     fpad(file, 0, 0xC5);
 
     /* place holder for end of stitches */
-    binaryWriteInt(file, 0x0000);
+    emb_write_i32(file, 0x0000);
     xxxEncodeDesign(file, pattern);
     endOfStitches = ftell(file);
     emb_fseek(file, 0xFC, SEEK_SET);
@@ -15315,8 +15292,8 @@ embGeometry_init(int type_in)
 
     switch (obj->type) {
     case EMB_ARC: {
-        obj->object.arc = emb_arc_init();
         /*
+        obj = emb_arc(1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
         emb_arc_init(EmbArc arc_in, unsigned int rgb, int lineType)
         arc = arc_in;
 
@@ -15404,10 +15381,10 @@ embGeometry_boundingRect(EmbGeometry *obj)
         setRect(arcRect);
         */
     }
-    r.top = 0.0;
-    r.left = 0.0;
-    r.bottom = 1.0;
-    r.right = 1.0;
+    r.y = 0.0;
+    r.x = 0.0;
+    r.w = 1.0;
+    r.h = 1.0;
     /*
     "Base"
     //If gripped, force this object to be drawn even if it is offscreen
@@ -15430,33 +15407,38 @@ embGeometry_boundingRect(EmbGeometry *obj)
  * TODO: some of these formulae may assume that the arc is circular,
  * correct for elliptic versions.
  *
- * Returns an EmbArcObject. It is created on the stack.
+ * Returns an EmbGeometry. It is created on the stack.
  *
  * Note that the default arc is the semicircular arc of the circle of radius
  * arc.
  */
-EmbArc
-emb_arc_init(void)
+EmbGeometry
+emb_arc(EmbReal x1, EmbReal y1, EmbReal x2, EmbReal y2, EmbReal x3, EmbReal y3)
 {
-    EmbArc arc;
-    arc.start.x = 0.0;
-    arc.start.y = -1.0;
-    arc.mid.x = 1.0;
-    arc.mid.y = 0.0;
-    arc.end.x = 0.0;
-    arc.end.y = 1.0;
-    return arc;
+    EmbGeometry g;
+    g.object.arc.start.x = x1;
+    g.object.arc.start.y = y1;
+    g.object.arc.mid.x = x2;
+    g.object.arc.mid.y = y2;
+    g.object.arc.end.x = x3;
+    g.object.arc.end.y = y3;
+    g.type = EMB_ARC;
+    return g;
 }
 
 /* Calculus based approach at determining whether a polygon is clockwise or counterclockwise.
  * Returns true if arc is clockwise.
  */
 char
-emb_arc_clockwise(EmbArc arc)
+emb_arc_clockwise(EmbGeometry g)
 {
-    EmbReal edge1 = (arc.mid.x-arc.start.x)*(arc.mid.y+arc.start.y);
-    EmbReal edge2 = (arc.end.x-arc.mid.x)*(arc.end.y+arc.mid.y);
-    EmbReal edge3 = (arc.start.x-arc.end.x)*(arc.start.y+arc.end.y);
+    if (g.type != EMB_ARC) {
+        return 0;
+    }
+    EmbArc arc = g.object.arc;
+    EmbReal edge1 = (arc.mid.x-arc.start.x) * (arc.mid.y+arc.start.y);
+    EmbReal edge2 = (arc.end.x-arc.mid.x) * (arc.end.y+arc.mid.y);
+    EmbReal edge3 = (arc.start.x-arc.end.x) * (arc.start.y+arc.end.y);
     if (edge1 + edge2 + edge3 >= 0.0) {
         return 1;
     }
@@ -15465,8 +15447,9 @@ emb_arc_clockwise(EmbArc arc)
 
 /* Calculates the CenterPoint of the Arc */
 EmbVector
-emb_arc_center(EmbArc arc)
+emb_arc_center(EmbGeometry g)
 {
+    EmbArc arc = g.object.arc;
     int emb_error = 0;
     EmbVector center;
     EmbVector a_vec, b_vec, aMid_vec, bMid_vec, aPerp_vec, bPerp_vec, pa, pb;
@@ -15499,66 +15482,95 @@ emb_arc_center(EmbArc arc)
 
 /* Calculate the Radius */
 EmbReal
-emb_arc_radius(EmbArc arc)
+emb_arc_radius(EmbGeometry g)
 {
-    EmbGeometry g;
-    g.object.arc = arc;
-    EmbReal incAngle = emb_arc_incAngle(arc);
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
+    EmbReal incAngle = emb_arc_incAngle(g);
     EmbReal chord = emb_get_real(&g, EMB_REAL_CHORD);
     return fabs(chord / (2.0 * sin(incAngle / 2.0)));
 }
 
 /* Calculate the Diameter */
 EmbReal
-emb_arc_diameter(EmbArc arc)
+emb_arc_diameter(EmbGeometry g)
 {
-    return fabs(emb_arc_radius(arc) * 2.0);
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
+    return fabs(emb_arc_radius(g) * 2.0);
 }
 
 /* Calculate the Chord Angle (from arc.start to arc.end). */
 EmbReal
-emb_arc_chordAngle(EmbArc arc)
+emb_arc_chordAngle(EmbGeometry g)
 {
-    EmbVector delta = emb_vector_subtract(arc.end, arc.start);
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
+    EmbVector delta = emb_vector_subtract(g.object.arc.end, g.object.arc.start);
     return atan2(delta.y, delta.x);
 }
 
 /* Calculate the Chord MidPoint. */
 EmbVector
-emb_arc_chordMid(EmbArc arc)
+emb_arc_chordMid(EmbGeometry g)
 {
-    return emb_vector_scale(emb_vector_add(arc.start, arc.end), 0.5);
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return emb_vector(0.0, 0.0);
+    }
+    EmbVector v = emb_vector_add(g.object.arc.start, g.object.arc.end);
+    return emb_vector_scale(v, 0.5);
 }
 
 /* Calculate the Sagitta. */
 EmbReal
-emb_arc_sagitta(EmbArc arc)
+emb_arc_sagitta(EmbGeometry g)
 {
-    EmbGeometry g;
-    g.object.arc = arc;
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
     EmbReal chord = emb_get_real(&g, EMB_REAL_CHORD);
-    EmbReal bulge = emb_arc_bulge(arc);
+    EmbReal bulge = emb_arc_bulge(g);
     return fabs((chord / 2.0) * bulge);
 }
 
 /* Calculate the Apothem */
 EmbReal
-emb_arc_apothem(EmbArc arc)
+emb_arc_apothem(EmbGeometry g)
 {
-    return fabs(emb_arc_radius(arc) - emb_arc_sagitta(arc));
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
+    return fabs(emb_arc_radius(g) - emb_arc_sagitta(g));
 }
 
 /* Calculate the Included Angle. */
 EmbReal
-emb_arc_incAngle(EmbArc arc)
+emb_arc_incAngle(EmbGeometry g)
 {
-    return atan(emb_arc_bulge(arc))*4.0;
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
+    return atan(emb_arc_bulge(g))*4.0;
 }
 
 /* TODO: fixme */
 EmbReal
-emb_arc_bulge(EmbArc arc)
+emb_arc_bulge(EmbGeometry g)
 {
+    if (g.type != EMB_ARC) {
+        /* ERROR */
+        return 0.0;
+    }
     return 1.0;
 }
 
@@ -15582,18 +15594,18 @@ emb_arc_bulge(EmbArc arc)
  */
 
 void
-emb_arc_setCenter(EmbArc *arc, EmbVector point)
+emb_arc_setCenter(EmbGeometry *g, EmbVector point)
 {
     EmbVector delta;
-    EmbVector old_center = emb_arc_center(*arc);
+    EmbVector old_center = emb_arc_center(*g);
     delta = emb_vector_subtract(point, old_center);
-    arc->start = emb_vector_add(arc->start, delta);
-    arc->mid = emb_vector_add(arc->mid, delta);
-    arc->end = emb_vector_add(arc->end, delta);
+    g->object.arc.start = emb_vector_add(g->object.arc.start, delta);
+    g->object.arc.mid = emb_vector_add(g->object.arc.mid, delta);
+    g->object.arc.end = emb_vector_add(g->object.arc.end, delta);
 }
 
 void
-emb_arc_setRadius(EmbArc *arc, float radius)
+emb_arc_setRadius(EmbGeometry *g, float radius)
 {
     EmbVector delta;
     float rad;
@@ -15604,23 +15616,23 @@ emb_arc_setRadius(EmbArc *arc, float radius)
         rad = radius;
     }
 
-    EmbVector center = emb_arc_center(*arc);
+    EmbVector center = emb_arc_center(*g);
     EmbReal delta_length;
 
-    delta = emb_vector_subtract(arc->start, center);
+    delta = emb_vector_subtract(g->object.arc.start, center);
     delta_length = emb_vector_length(delta);
     delta = emb_vector_scale(delta, rad/delta_length);
-    arc->start = emb_vector_add(center, delta);
+    g->object.arc.start = emb_vector_add(center, delta);
 
-    delta = emb_vector_subtract(arc->mid, center);
+    delta = emb_vector_subtract(g->object.arc.mid, center);
     delta_length = emb_vector_length(delta);
     delta = emb_vector_scale(delta, rad/delta_length);
-    arc->mid = emb_vector_add(center, delta);
+    g->object.arc.mid = emb_vector_add(center, delta);
 
-    delta = emb_vector_subtract(arc->end, center);
+    delta = emb_vector_subtract(g->object.arc.end, center);
     delta_length = emb_vector_length(delta);
     delta = emb_vector_scale(delta, rad/delta_length);
-    arc->end = emb_vector_add(center, delta);
+    g->object.arc.end = emb_vector_add(center, delta);
 }
 
 void
@@ -15637,26 +15649,27 @@ emb_arc_setEndAngle(EmbArc *arc, float angle)
     //TODO: ArcObject setEndAngle
 }
 
+/* . */
 EmbReal
-emb_arc_startAngle(EmbArc arc)
+emb_arc_startAngle(EmbGeometry g)
 {
-    EmbVector delta;
-    EmbVector center = emb_arc_center(arc);
-    delta = emb_vector_subtract(arc.end, center);
+    EmbVector center = emb_arc_center(g);
+    EmbVector delta = emb_vector_subtract(g.object.arc.start, center);
     float angle = emb_vector_angle(delta);
     return fmodf(angle, 360.0);
 }
 
+/* . */
 EmbReal
-emb_arc_endAngle(EmbArc arc)
+emb_arc_endAngle(EmbGeometry g)
 {
-    EmbVector delta;
-    EmbVector center = emb_arc_center(arc);
-    delta = emb_vector_subtract(arc.end, center);
+    EmbVector center = emb_arc_center(g);
+    EmbVector delta = emb_vector_subtract(g.object.arc.end, center);
     float angle = emb_vector_angle(delta);
     return fmodf(angle, 360.0);
 }
 
+/* . */
 EmbReal
 emb_arc_area(EmbArc arc)
 {
@@ -17171,7 +17184,7 @@ EmbVector embRect_bottomRight(EmbRect rect)
     updatePath();
  */
 EmbGeometry
-emb_circle_init(EmbReal x, EmbReal y, EmbReal radius)
+emb_circle(EmbReal x, EmbReal y, EmbReal radius)
 {
     EmbGeometry g;
     g.object.circle.center.x = x;
@@ -17519,23 +17532,23 @@ emb_line_intersectionPoint(EmbLine line1, EmbLine line2, int *emb_error)
     return result;
 }
 
-/*
+/* .
  */
 EmbRect
-embRect_init(void)
+emb_rect(EmbReal x, EmbReal y, EmbReal w, EmbReal h)
 {
     EmbRect rect;
-    rect.left = 0.0;
-    rect.top = 0.0;
-    rect.right = 1.0;
-    rect.bottom = 1.0;
+    rect.x = x;
+    rect.y = y;
+    rect.w = w;
+    rect.h = h;
     return rect;
 }
 
 EmbReal
 embRect_area(EmbRect rect)
 {
-    return (rect.bottom - rect.top) * (rect.right - rect.left);
+    return rect.w * rect.h;
 }
 
 //NOTE: This void should be used to interpret various object types and save them as polylines for stitchOnly formats.
@@ -17823,6 +17836,16 @@ void textSingle_setTextUpsideDown(char val)
     objTextUpsideDown = val;
     setText(objText);
     */
+}
+
+/* . */
+EmbVector
+emb_vector(EmbReal x, EmbReal y)
+{
+    EmbVector v;
+    v.x = x;
+    v.y = y;
+    return v;
 }
 
 /* Finds the unit length vector a result in the same direction as a vector.
@@ -18547,10 +18570,10 @@ emb_pattern_calcBoundingBox(EmbPattern* p)
     EmbStitch pt;
     int i, j;
 
-    r.left = 0;
-    r.right = 0;
-    r.top = 0;
-    r.bottom = 0;
+    r.x = 0.0;
+    r.y = 0.0;
+    r.w = 1.0;
+    r.h = 1.0;
 
     if (!p) {
         printf("ERROR: emb-pattern.c emb_pattern_calcBoundingBox(), ");
@@ -18562,26 +18585,22 @@ emb_pattern_calcBoundingBox(EmbPattern* p)
     /* TODO: Come back and optimize this mess so that after going thru all objects
             and stitches, if the rectangle isn't reasonable, then return a default rect */
     if ((p->stitch_list->count == 0) && (p->geometry->count == 0)) {
-        r.top = 0.0;
-        r.left = 0.0;
-        r.bottom = 1.0;
-        r.right = 1.0;
         return r;
     }
-    r.left = 99999.0;
-    r.top =  99999.0;
-    r.right = -99999.0;
-    r.bottom = -99999.0;
+    r.x = -99999.0;
+    r.y = -99999.0;
+    double right = 99999.0;
+    double bottom = 99999.0;
 
     for (i = 0; i < p->stitch_list->count; i++) {
         /* If the point lies outside of the accumulated bounding
         * rectangle, then inflate the bounding rect to include it. */
         pt = p->stitch_list->stitch[i];
         if (!(pt.flags & TRIM)) {
-            r.left = EMB_MIN(r.left, pt.x);
-            r.top = EMB_MIN(r.top, pt.y);
-            r.right = EMB_MAX(r.right, pt.x);
-            r.bottom = EMB_MAX(r.bottom, pt.y);
+            r.x = EMB_MIN(r.x, pt.x);
+            r.y = EMB_MIN(r.y, pt.y);
+            right = EMB_MAX(right, pt.x);
+            bottom = EMB_MAX(bottom, pt.y);
         }
     }
 
@@ -18592,47 +18611,47 @@ emb_pattern_calcBoundingBox(EmbPattern* p)
             /* TODO: emb_pattern_calcBoundingBox for arcs,
             for now just checks the start point */
             EmbArc arc = g.object.arc;
-            r.left = EMB_MIN(r.left, arc.start.x);
-            r.top = EMB_MIN(r.top, arc.start.y);
-            r.right = EMB_MAX(r.right, arc.start.x);
-            r.bottom = EMB_MAX(r.bottom, arc.start.y);
+            r.x = EMB_MIN(r.x, arc.start.x);
+            r.y = EMB_MIN(r.y, arc.start.y);
+            right = EMB_MAX(right, arc.start.x);
+            bottom = EMB_MAX(bottom, arc.start.y);
             break;
         }
         case EMB_CIRCLE: {
             EmbCircle circle = g.object.circle;
-            r.left = EMB_MIN(r.left, circle.center.x - circle.radius);
-            r.top = EMB_MIN(r.top, circle.center.y - circle.radius);
-            r.right = EMB_MAX(r.right, circle.center.x + circle.radius);
-            r.bottom = EMB_MAX(r.bottom, circle.center.y + circle.radius);
+            r.x = EMB_MIN(r.x, circle.center.x - circle.radius);
+            r.y = EMB_MIN(r.y, circle.center.y - circle.radius);
+            right = EMB_MAX(right, circle.center.x + circle.radius);
+            bottom = EMB_MAX(bottom, circle.center.y + circle.radius);
             break;
         }
         case EMB_ELLIPSE: {
             /* TODO: account for rotation */
             EmbEllipse ellipse = g.object.ellipse;
-            r.left = EMB_MIN(r.left, ellipse.center.x - ellipse.radius.x);
-            r.top = EMB_MIN(r.top, ellipse.center.y - ellipse.radius.y);
-            r.right = EMB_MAX(r.right, ellipse.center.x + ellipse.radius.x);
-            r.bottom = EMB_MAX(r.bottom, ellipse.center.y + ellipse.radius.y);
+            r.x = EMB_MIN(r.x, ellipse.center.x - ellipse.radius.x);
+            r.y = EMB_MIN(r.y, ellipse.center.y - ellipse.radius.y);
+            right = EMB_MAX(right, ellipse.center.x + ellipse.radius.x);
+            bottom = EMB_MAX(bottom, ellipse.center.y + ellipse.radius.y);
             break;
         }
         case EMB_LINE: {
             EmbLine line = g.object.line;
-            r.left = EMB_MIN(r.left, line.start.x);
-            r.left = EMB_MIN(r.left, line.end.x);
-            r.top = EMB_MIN(r.top, line.start.y);
-            r.top = EMB_MIN(r.top, line.end.y);
-            r.right = EMB_MAX(r.right, line.start.x);
-            r.right = EMB_MAX(r.right, line.end.x);
-            r.bottom = EMB_MAX(r.bottom, line.start.y);
-            r.bottom = EMB_MAX(r.bottom, line.end.y);
+            r.x = EMB_MIN(r.x, line.start.x);
+            r.x = EMB_MIN(r.x, line.end.x);
+            r.y = EMB_MIN(r.y, line.start.y);
+            r.y = EMB_MIN(r.y, line.end.y);
+            right = EMB_MAX(right, line.start.x);
+            right = EMB_MAX(right, line.end.x);
+            bottom = EMB_MAX(bottom, line.start.y);
+            bottom = EMB_MAX(bottom, line.end.y);
             break;
         }
         case EMB_POINT: {
             EmbVector point = g.object.point.position;
-            r.left = EMB_MIN(r.left, point.x);
-            r.top = EMB_MIN(r.top, point.y);
-            r.right = EMB_MAX(r.right, point.x);
-            r.bottom = EMB_MAX(r.bottom, point.y);
+            r.x = EMB_MIN(r.x, point.x);
+            r.y = EMB_MIN(r.y, point.y);
+            right = EMB_MAX(right, point.x);
+            bottom = EMB_MAX(bottom, point.y);
             break;
         }
         case EMB_POLYGON: {
@@ -18651,10 +18670,10 @@ emb_pattern_calcBoundingBox(EmbPattern* p)
         }
         case EMB_RECT: {
             EmbRect rect = g.object.rect;
-            r.left = EMB_MIN(r.left, rect.left);
-            r.top = EMB_MIN(r.top, rect.top);
-            r.right = EMB_MAX(r.right, rect.right);
-            r.bottom = EMB_MAX(r.bottom, rect.bottom);
+            r.x = EMB_MIN(r.x, rect.x);
+            r.y = EMB_MIN(r.y, rect.y);
+            right = EMB_MAX(right, r.x + rect.w);
+            bottom = EMB_MAX(bottom, r.y + rect.h);
             break;
         }
         case EMB_SPLINE: {
@@ -18667,6 +18686,9 @@ emb_pattern_calcBoundingBox(EmbPattern* p)
             break;
         }
     }
+
+    r.w = right - r.x;
+    r.h = bottom - r.y;
 
     return r;
 }
@@ -18809,12 +18831,12 @@ emb_pattern_flip(EmbPattern* p, int horz, int vert)
         }
         case EMB_RECT: {
             if (horz) {
-                g->object.rect.left *= -1.0;
-                g->object.rect.right *= -1.0;
+                g->object.rect.x *= -1.0;
+                g->object.rect.y *= -1.0;
             }
             if (vert) {
-                g->object.rect.top *= -1.0;
-                g->object.rect.bottom *= -1.0;
+                g->object.rect.w *= -1.0;
+                g->object.rect.h *= -1.0;
             }
             break;
         }
@@ -18930,8 +18952,8 @@ emb_pattern_center(EmbPattern* p)
     }
     boundingRect = emb_pattern_calcBoundingBox(p);
 
-    moveLeft = (int)(boundingRect.left - (boundingRect.right- boundingRect.left) / 2.0);
-    moveTop = (int)(boundingRect.top - (boundingRect.bottom - boundingRect.top) / 2.0);
+    moveLeft = (int)(boundingRect.x - boundingRect.w / 2.0);
+    moveTop = (int)(boundingRect.y - boundingRect.h / 2.0);
 
     for (i = 0; i < p->stitch_list->count; i++) {
         p->stitch_list->stitch[i].x -= moveLeft;
@@ -19192,10 +19214,10 @@ emb_pattern_designDetails(EmbPattern *pattern)
         printf("trim_stitches: %d\n", trim_stitches);
         printf("unknown_stitches: %d\n", unknown_stitches);
         printf("num_colors: %d\n", pattern->thread_list->count);
-        printf("bounds.left: %f\n", bounds.left);
-        printf("bounds.right: %f\n", bounds.right);
-        printf("bounds.top: %f\n", bounds.top);
-        printf("bounds.bottom: %f\n", bounds.bottom);
+        printf("bounds.x: %f\n", bounds.x);
+        printf("bounds.y: %f\n", bounds.y);
+        printf("bounds.w: %f\n", bounds.w);
+        printf("bounds.h: %f\n", bounds.h);
     }
 /*
     EmbReal minx = 0.0, maxx = 0.0, miny = 0.0, maxy = 0.0;
@@ -19291,12 +19313,12 @@ emb_pattern_designDetails(EmbPattern *pattern)
     puts("Stitches: %d\n", num_stitches);
     puts("Colors: %d\n", num_colors);
     puts("Jumps: %d\n", jump_stitches);
-    puts("Top: %f mm", bounds.top);
-    puts("Left: %f mm", bounds.left);
-    puts("Bottom: %f mm", bounds.bottom);
-    puts("Right: %f mm", bounds.right);
-    puts("Width: %f mm", bounds.right - bounds.left);
-    puts("Height: %f mm", bounds.bottom - bounds.top);
+    puts("Top: %f mm", bounds.y);
+    puts("Left: %f mm", bounds.x);
+    puts("Bottom: %f mm", bounds.h + bounds.y);
+    puts("Right: %f mm", bounds.w + bounds.x);
+    puts("Width: %f mm", bounds.w);
+    puts("Height: %f mm", bounds.h);
     grid->addWidget(new QLabel(tr("\nStitch Distribution: \n")),9,0,1,2);
     grid->addWidget(new QLabel(str), 10, 0, 1, 1);
     grid->addWidget(new QLabel(tr("\nThread Length By Color: \n")),11,0,1,2);

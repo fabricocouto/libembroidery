@@ -854,10 +854,10 @@ typedef struct EmbArc_
 /* . */
 typedef struct EmbRect_
 {
-    EmbReal top;
-    EmbReal left;
-    EmbReal bottom;
-    EmbReal right;
+    EmbReal x;
+    EmbReal y;
+    EmbReal w;
+    EmbReal h;
     EmbReal rotation;
     EmbReal radius;
 } EmbRect;
@@ -1002,6 +1002,8 @@ EMB_PUBLIC int hilbert_curve(EmbPattern *pattern, int iterations);
 EMB_PUBLIC int emb_identify_format(const char *ending);
 EMB_PUBLIC int convert(const char *inf, const char *outf);
 
+EMB_PUBLIC EmbVector emb_vector(EmbReal x, EmbReal y);
+
 EMB_PUBLIC void emb_processor(char *state, const char *program, int program_length);
 EMB_PUBLIC int emb_compiler(const char *program, int language, char *compiled_program);
 EMB_PUBLIC void emb_actuator(const char *program, int language);
@@ -1062,18 +1064,18 @@ EMB_PUBLIC void emb_set_real(EmbGeometry *g, int id, EmbReal r);
 EMB_PUBLIC void emb_set_vector(EmbGeometry *g, int id, EmbVector v);
 EMB_PUBLIC void emb_set_int(EmbGeometry *g, int id, int i);
 
-EMB_PUBLIC EmbArc emb_arc_init(void);
-EMB_PUBLIC char emb_arc_clockwise(EmbArc arc);
-EMB_PUBLIC EmbVector emb_arc_center(EmbArc arc);
-EMB_PUBLIC EmbReal emb_arc_radius(EmbArc arc);
-EMB_PUBLIC EmbReal emb_arc_diameter(EmbArc arc);
-EMB_PUBLIC EmbVector emb_arc_chordMid(EmbArc arc);
-EMB_PUBLIC EmbReal emb_arc_sagitta(EmbArc arc);
-EMB_PUBLIC EmbReal emb_arc_apothem(EmbArc arc);
-EMB_PUBLIC EmbReal emb_arc_incAngle(EmbArc arc);
-EMB_PUBLIC EmbReal emb_arc_bulge(EmbArc arc);
+EMB_PUBLIC EmbGeometry emb_arc(EmbReal, EmbReal, EmbReal, EmbReal, EmbReal, EmbReal);
+EMB_PUBLIC char emb_arc_clockwise(EmbGeometry arc);
+EMB_PUBLIC EmbVector emb_arc_center(EmbGeometry arc);
+EMB_PUBLIC EmbReal emb_arc_radius(EmbGeometry arc);
+EMB_PUBLIC EmbReal emb_arc_diameter(EmbGeometry arc);
+EMB_PUBLIC EmbVector emb_arc_chordMid(EmbGeometry arc);
+EMB_PUBLIC EmbReal emb_arc_sagitta(EmbGeometry arc);
+EMB_PUBLIC EmbReal emb_arc_apothem(EmbGeometry arc);
+EMB_PUBLIC EmbReal emb_arc_incAngle(EmbGeometry arc);
+EMB_PUBLIC EmbReal emb_arc_bulge(EmbGeometry arc);
 
-EMB_PUBLIC EmbGeometry emb_circle_init(EmbReal x, EmbReal y, EmbReal r);
+EMB_PUBLIC EmbGeometry emb_circle(EmbReal x, EmbReal y, EmbReal r);
 EMB_PUBLIC int getCircleCircleIntersections(
      EmbCircle c0, EmbCircle c1, EmbVector *v0, EmbVector *v1);
 EMB_PUBLIC int getCircleTangentPoints(
@@ -1091,7 +1093,7 @@ EMB_PUBLIC void embImage_read(EmbImage *image, char *fname);
 EMB_PUBLIC int embImage_write(EmbImage *image, char *fname);
 EMB_PUBLIC void embImage_free(EmbImage *image);
 
-EMB_PUBLIC EmbRect embRect_init(void);
+EMB_PUBLIC EmbRect emb_rect(EmbReal, EmbReal, EmbReal, EmbReal);
 EMB_PUBLIC EmbReal embRect_area(EmbRect);
 
 EMB_PUBLIC int threadColor(const char*, int brand);
