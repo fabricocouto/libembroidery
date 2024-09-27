@@ -35,6 +35,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <string.h>
+#include <stdbool.h>
 
 void *
 emb_fopen(const char *fname, const char *mode)
@@ -1774,50 +1775,48 @@ token_is_int(EmbStackElement arg)
     return (arg.data_type == INT_TYPE);
 }
 
-#define GET_1_MORE_TOKEN \
-    if (stack->position < 1) { \
-        break; \
-    } \
-\
-    EmbStackElement arg1 = stack->stack[stack->position-2]; \
-    if (!token_is_int(arg1)) { \
-        break; \
-    } \
-\
-    stack_pop(stack); \
-    arg1 = stack_pop(stack);
+/* . */
+int
+get_int_tokens(EmbStack *stack, EmbStackElement *args, int n_tokens)
+{
+    int i;
+    if (stack->position < n_tokens) {
+        return 0;
+    }
 
-#define GET_2_MORE_TOKENS \
-    if (stack->position < 2) { \
-        break; \
-    } \
-\
-    EmbStackElement arg1 = stack->stack[stack->position-2]; \
-    EmbStackElement arg2 = stack->stack[stack->position-3]; \
-    if (!token_is_int(arg1) || !token_is_int(arg2)) { \
-        break; \
-    } \
-\
-    stack_pop(stack); \
-    arg2 = stack_pop(stack); \
-    arg1 = stack_pop(stack);
+    for (i = 0; i < n_tokens; i++) {
+        args[i] = stack->stack[stack->position-(2+i)];
+        if (!token_is_int(args[i])) {
+            return 0;
+        }
+    }
+
+    stack_pop(stack);
+    for (i = n_tokens-1; i >= 0; i++) {
+        args[i] = stack_pop(stack);
+    }
+    return 1;
+}
 
 /* .
  */
 int
 process_stack_head(EmbStack *stack)
 {
-    char token[200];
+    EmbString token;
     EmbStackElement element = stack->stack[stack->position-1];
+    EmbStackElement args[10];
     if (!element.attribute) {
         return;
     }
     switch (element.i) {
     /* 3.6.1 Stack */
     case PS_FUNC_DUP: {
-        GET_1_MORE_TOKEN
-        stack_push(stack, arg1.s);
-        stack_push(stack, arg1.s);
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        stack_push(stack, args[0].s);
+        stack_push(stack, args[0].s);
         break;
     }
     case PS_FUNC_EXCH: {
@@ -1850,50 +1849,66 @@ process_stack_head(EmbStack *stack)
     }
     /* 3.6.2 Mathematical */
     case PS_FUNC_ADD: {
-        GET_2_MORE_TOKENS
-        sprintf(token, "%d", atoi(arg1.s) + atoi(arg2.s));
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
+        sprintf(token, "%d", atoi(args[0].s) + atoi(args[1].s));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_SUB: {
-        GET_2_MORE_TOKENS
-        sprintf(token, "%d", atoi(arg1.s) - atoi(arg2.s));
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
+        sprintf(token, "%d", atoi(args[0].s) - atoi(args[1].s));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_MUL: {
-        GET_2_MORE_TOKENS
-        sprintf(token, "%d", atoi(arg1.s) * atoi(arg2.s));
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
+        sprintf(token, "%d", atoi(args[0].s) * atoi(args[1].s));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_DIV: {
-        GET_2_MORE_TOKENS
-        sprintf(token, "%f", atof(arg1.s) / atof(arg2.s));
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
+        sprintf(token, "%f", atof(args[0].s) / atof(args[1].s));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_IDIV: {
-        GET_2_MORE_TOKENS
-        sprintf(token, "%d", atoi(arg1.s) / atoi(arg2.s));
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
+        sprintf(token, "%d", atoi(args[0].s) / atoi(args[1].s));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_MOD: {
-        GET_2_MORE_TOKENS
-        sprintf(token, "%d", atoi(arg1.s) % atoi(arg2.s));
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
+        sprintf(token, "%d", atoi(args[0].s) % atoi(args[1].s));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_ABS: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%d", abs(atoi(arg1.s)));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%d", abs(atoi(args[0].s)));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_NEG: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%d", -atoi(arg1.s));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%d", -atoi(args[0].s));
         stack_push(stack, token);
         break;
     }
@@ -1910,14 +1925,18 @@ process_stack_head(EmbStack *stack)
         break;
     }
     case PS_FUNC_SQRT: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%f", sqrt(atof(arg1.s)));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%f", sqrt(atof(args[0].s)));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_EXP: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%f", exp(atof(arg1.s)));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%f", exp(atof(args[0].s)));
         stack_push(stack, token);
         break;
     }
@@ -1928,32 +1947,42 @@ process_stack_head(EmbStack *stack)
         break;
     }
     case PS_FUNC_sin: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%f", sin(atof(arg1.s)));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%f", sin(atof(args[0].s)));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_cos: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%f", cos(atof(arg1.s)));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%f", cos(atof(args[0].s)));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_atan: {
-        GET_1_MORE_TOKEN
-        sprintf(token, "%f", atan(atof(arg1.s)));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        sprintf(token, "%f", atan(atof(args[0].s)));
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_rand: {
-        GET_1_MORE_TOKEN
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
         sprintf(token, "%d", rand());
         stack_push(stack, token);
         break;
     }
     case PS_FUNC_srand: {
-        GET_1_MORE_TOKEN
-        srand(atoi(arg1.s));
+        if (!get_int_tokens(stack, args, 1)) {
+            break;
+        }
+        srand(atoi(args[0].s));
         break;
     }
     case PS_FUNC_rrand: {
@@ -2052,39 +2081,57 @@ process_stack_head(EmbStack *stack)
     }
     /* 3.6.4 Boolean */
     case PS_FUNC_eq: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_ne: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_gt: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_ge: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_le: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_lt: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_and: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_or: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_xor: {
-        GET_2_MORE_TOKENS
+        if (!get_int_tokens(stack, args, 2)) {
+            break;
+        }
         break;
     }
     case PS_FUNC_true: {
@@ -3048,7 +3095,7 @@ fpad(void* file, char c, int n)
 void
 emb_write_i16(void* f, int16_t data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_LITTLE_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 2);
 #endif
@@ -3060,7 +3107,7 @@ emb_write_i16(void* f, int16_t data)
 void
 emb_write_i16be(void* f, int16_t data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_LITTLE_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 2);
 #endif
@@ -3072,7 +3119,7 @@ emb_write_i16be(void* f, int16_t data)
 void
 emb_write_u16(void* f, uint16_t data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_LITTLE_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 2);
 #endif
@@ -3084,7 +3131,7 @@ emb_write_u16(void* f, uint16_t data)
 void
 emb_write_u16BE(void* f, unsigned short data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_BIG_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 2);
 #endif
@@ -3096,7 +3143,7 @@ emb_write_u16BE(void* f, unsigned short data)
 void
 emb_write_i32(void* f, int data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_LITTLE_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 4);
 #endif
@@ -3107,7 +3154,7 @@ emb_write_i32(void* f, int data)
 void
 emb_write_i32be(void* f, int data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_BIG_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 4);
 #endif
@@ -3119,7 +3166,7 @@ emb_write_i32be(void* f, int data)
 void
 emb_write_u32(void* f, unsigned int data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_LITTLE_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 4);
 #endif
@@ -3131,7 +3178,7 @@ emb_write_u32(void* f, unsigned int data)
 void
 emb_write_u32be(void* f, unsigned int data)
 {
-    void *b = (void*)data;
+    void *b = (void*)(&data);
 #if EMB_BIG_ENDIAN != ENDIAN_HOST
     reverse_byte_order(b, 4);
 #endif
@@ -5061,7 +5108,8 @@ command_line_interface(int argc, char* argv[])
     int i, j, result;
     /* If no argument is given, drop into the postscript interpreter. */
     if (argc == 1) {
-        return emb_repl();
+        usage();
+        return 0;
     }
 
     char *script = (char *)malloc(argc*100);
@@ -15909,7 +15957,7 @@ emb_circle_prompt(const char *str)
 {
     /*
     if (view.ui_mode == "CIRCLE_MODE_1P_RAD") {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             if (str == "2P") {
                 //TODO: Probably should add additional qsTr calls here.
                 view.ui_mode = "CIRCLE_MODE_2P";
@@ -15925,7 +15973,7 @@ emb_circle_prompt(const char *str)
             }
             else {
                 std::vector<std::string> strList = str.split(",");
-                if (std::isnan(strList[0]) || isnan(strList[1])) {
+                if (isnan(strList[0]) || isnan(strList[1])) {
                     alert(translate("Point or option keyword required."));
                     setPromptPrefix(translate("Specify center point for circle or [3P/2P/Ttr (tan tan radius)]: "));
                 }
@@ -15950,7 +15998,7 @@ emb_circle_prompt(const char *str)
             }
             else {
                 float num = Number(str);
-                if (std::isnan(num)) {
+                if (isnan(num)) {
                     alert(translate("Requires numeric radius, point on circumference, or \"D\"."));
                     setPromptPrefix(translate("Specify radius of circle or [Diameter]: "));
                 }
@@ -15966,12 +16014,12 @@ emb_circle_prompt(const char *str)
         }
     }
     else if (view.ui_mode == MODE_1P_DIA) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             error("CIRCLE", translate("This should never happen."));
         }
-        if (std::isnan(global.x2)) {
+        if (isnan(global.x2)) {
             float num = Number(str);
-            if (std::isnan(num)) {
+            if (isnan(num)) {
                 alert(translate("Requires numeric distance or second point."));
                 setPromptPrefix(translate("Specify diameter of circle: "));
             }
@@ -15989,9 +16037,9 @@ emb_circle_prompt(const char *str)
         }
     }
     else if (view.ui_mode == MODE_2P) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify first end point of circle's diameter: "));
             }
@@ -16004,9 +16052,9 @@ emb_circle_prompt(const char *str)
                 setPromptPrefix(translate("Specify second end point of circle's diameter: "));
             }
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify second end point of circle's diameter: "));
             }
@@ -16023,9 +16071,9 @@ emb_circle_prompt(const char *str)
         }
     }
     else if (view.ui_mode == MODE_3P) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify first point of circle: "));
             }
@@ -16035,9 +16083,9 @@ emb_circle_prompt(const char *str)
                 setPromptPrefix(translate("Specify second point of circle: "));
             }
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify second point of circle: "));
             }
@@ -16051,9 +16099,9 @@ emb_circle_prompt(const char *str)
                 setPromptPrefix(translate("Specify third point of circle: "));
             }
         }
-        else if (std::isnan(global.x3)) {
+        else if (isnan(global.x3)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify third point of circle: "));
             }
@@ -16140,20 +16188,6 @@ void emb_circle_paint(QPainter* painter)
     painter->setPen(paintPen);
 
     painter->drawEllipse(rect());
-}
-
-QPainterPath Circle_objectSavePath()
-{
-    QPainterPath path;
-    EmbRect r = rect();
-    path.arcMoveTo(r, 0);
-    path.arcTo(r, 0, 360);
-
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-    return trans.map(path);
 }
 
 void dim_leader_init(EmbLine line, unsigned int rgb, int lineType)
@@ -16356,7 +16390,7 @@ void embEllipse_click(float x, float y)
     printf("%f %f", x, y);
     /*
     if (view.ui_mode == MODE_MAJORDIAMETER_MINORRADIUS) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             global.x1 = x;
             global.y1 = y;
             addRubber("ELLIPSE");
@@ -16365,7 +16399,7 @@ void embEllipse_click(float x, float y)
             appendPromptHistory();
             setPromptPrefix(translate("Specify first axis end point: "));
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             global.x2 = x;
             global.y2 = y;
             global.cx = (global.x1 + global.x2)/2.0;
@@ -16381,7 +16415,7 @@ void embEllipse_click(float x, float y)
             appendPromptHistory();
             setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
         }
-        else if (std::isnan(global.x3)) {
+        else if (isnan(global.x3)) {
             global.x3 = x;
             global.y3 = y;
             global.height = perpendicularDistance(global.x3, global.y3, global.x1, global.y1, global.x2, global.y2)*2.0;
@@ -16395,7 +16429,7 @@ void embEllipse_click(float x, float y)
         }
     }
     else if (view.ui_mode == MODE_MAJORRADIUS_MINORRADIUS) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             global.x1 = x;
             global.y1 = y;
             global.cx = global.x1;
@@ -16407,7 +16441,7 @@ void embEllipse_click(float x, float y)
             appendPromptHistory();
             setPromptPrefix(translate("Specify first axis end point: "));
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             global.x2 = x;
             global.y2 = y;
             global.width = calculateDistance(global.cx, global.cy, global.x2, global.y2)*2.0;
@@ -16419,7 +16453,7 @@ void embEllipse_click(float x, float y)
             appendPromptHistory();
             setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
         }
-        else if (std::isnan(global.x3)) {
+        else if (isnan(global.x3)) {
             global.x3 = x;
             global.y3 = y;
             global.height = perpendicularDistance(global.x3, global.y3, global.cx, global.cy, global.x2, global.y2)*2.0;
@@ -16433,13 +16467,13 @@ void embEllipse_click(float x, float y)
         }
     }
     else if (view.ui_mode == MODE_ELLIPSE_ROTATION) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             error("ELLIPSE", translate("This should never happen."));
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             error("ELLIPSE", translate("This should never happen."));
         }
-        else if (std::isnan(global.x3)) {
+        else if (isnan(global.x3)) {
             float angle = calculateAngle(global.cx, global.cy, x, y);
             global.height = cos(angle*Math.PI/180.0)*global.width;
             addEllipse(global.cx, global.cy, global.width, global.height, global.rot, false);
@@ -16454,14 +16488,14 @@ void embEllipse_click(float x, float y)
 void prompt(const char *str)
 {
     if (mode == MAJORDIAMETER_MINORRADIUS) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             if (str == "C" || str == "CENTER") {
                 view.ui_mode = MODE_MAJORRADIUS_MINORRADIUS;
                 setPromptPrefix(translate("Specify center point: "));
             }
             else {
                 std::vector<std::string> strList = str.split(",");
-                if (std::isnan(strList[0]) || isnan(strList[1])) {
+                if (isnan(strList[0]) || isnan(strList[1])) {
                     alert(translate("Point or option keyword required."));
                     setPromptPrefix(translate("Specify first axis start point or [Center]: "));
                 }
@@ -16475,9 +16509,9 @@ void prompt(const char *str)
                 }
             }
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify first axis end point: "));
             }
@@ -16497,14 +16531,14 @@ void prompt(const char *str)
                 setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
             }
         }
-        else if (std::isnan(global.x3)) {
+        else if (isnan(global.x3)) {
             if (str == "R" || str == "ROTATION") {//TODO: Probably should add additional qsTr calls here.
                 view.ui_mode = MODE_ELLIPSE_ROTATION;
                 setPromptPrefix(translate("Specify rotation: "));
             }
             else {
                 std::vector<std::string> strList = str.split(",");
-                if (std::isnan(strList[0]) || isnan(strList[1])) {
+                if (isnan(strList[0]) || isnan(strList[1])) {
                     alert(translate("Point or option keyword required."));
                     setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
                 }
@@ -16520,9 +16554,9 @@ void prompt(const char *str)
         }
     }
     else if (mode == MAJORRADIUS_MINORRADIUS) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify center point: "));
             }
@@ -16538,9 +16572,9 @@ void prompt(const char *str)
                 setPromptPrefix(translate("Specify first axis end point: "));
             }
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Invalid point."));
                 setPromptPrefix(translate("Specify first axis end point: "));
             }
@@ -16556,14 +16590,14 @@ void prompt(const char *str)
                 setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
             }
         }
-        else if (std::isnan(global.x3)) {
+        else if (isnan(global.x3)) {
             if (str == "R" || str == "ROTATION") {
                 view.ui_mode = MODE_ELLIPSE_ROTATION;
                 setPromptPrefix(translate("Specify ellipse rotation: "));
             }
             else {
                 std::vector<std::string> strList = str.split(",");
-                if (std::isnan(strList[0]) || isnan(strList[1])) {
+                if (isnan(strList[0]) || isnan(strList[1])) {
                     alert(translate("Point or option keyword required."));
                     setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
                 }
@@ -16579,14 +16613,14 @@ void prompt(const char *str)
         }
     }
     else if (view.ui_mode == MODE_ELLIPSE_ROTATION) {
-        if (std::isnan(global.x1)) {
+        if (isnan(global.x1)) {
             error("ELLIPSE", translate("This should never happen."));
         }
-        else if (std::isnan(global.x2)) {
+        else if (isnan(global.x2)) {
             error("ELLIPSE", translate("This should never happen."));
         }
-        else if (std::isnan(global.x3)) {
-            if (std::isnan(str)) {
+        else if (isnan(global.x3)) {
+            if (isnan(str)) {
                 alert(translate("Invalid angle. Input a numeric angle or pick a point."));
                 setPromptPrefix(translate("Specify rotation: "));
             }
@@ -16738,7 +16772,7 @@ line_prompt(const char *str)
 {
     if (global.firstRun) {
         std::vector<std::string> strList = str.split(",");
-        if (std::isnan(strList[0]) || isnan(strList[1])) {
+        if (isnan(strList[0]) || isnan(strList[1])) {
             alert(translate("Invalid point."));
             setPromptPrefix(translate("Specify first point: "));
         }
@@ -16760,7 +16794,7 @@ line_prompt(const char *str)
         }
         else {
             std::vector<std::string> strList = str.split(",");
-            if (std::isnan(strList[0]) || isnan(strList[1])) {
+            if (isnan(strList[0]) || isnan(strList[1])) {
                 alert(translate("Point or option keyword required."));
                 setPromptPrefix(translate("Specify next point or [Undo]: "));
             }
@@ -16868,13 +16902,6 @@ line_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* widget)
     }
 }
 
-QPainterPath line_objectSavePath()
-{
-    QPainterPath path;
-    path.lineTo(objectDeltaX(), objectDeltaY());
-    return path;
-}
-
 path_PathObject(float x, float y, const QPainterPath p, unsigned int rgb, QGraphicsItem* parent)
 {
     debug_message("PathObject Constructor()");
@@ -16921,16 +16948,6 @@ void path_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidg
     painter->drawPath(objectPath());
 }
 
-QPainterPath
-path_objectSavePath()
-{
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-    return trans.map(normalPath);
-}
-
 void point_init(float x, float y, unsigned int rgb, int lineType)
 {
     setData(OBJ_TYPE, type);
@@ -16961,13 +16978,6 @@ void point_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* w
     painter->drawPoint(0,0);
 }
 
-QPainterPath point_objectSavePath()
-{
-    QPainterPath path;
-    path.addRect(-0.00000001, -0.00000001, 0.00000002, 0.00000002);
-    return path;
-}
-
 void
 emb_polygon(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphicsItem* parent)
 {
@@ -16975,7 +16985,8 @@ emb_polygon(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphics
     init(x, y, p, rgb, SolidLine); //TODO: getCurrentLineType
 }
 
-void polygon_PolygonObject(PolygonObject* obj, QGraphicsItem* parent)
+void
+polygon_PolygonObject(PolygonObject* obj, QGraphicsItem* parent)
 {
     debug_message("PolygonObject Constructor()");
     if (obj) {
@@ -17037,18 +17048,6 @@ int polygon_findIndex(EmbVector point)
     return -1;
 }
 
-QPainterPath
-polygon_objectSavePath()
-{
-    QPainterPath closedPath = normalPath;
-    closedPath.closeSubpath();
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-    return trans.map(closedPath);
-}
-
 void
 emb_polyline(float x, float y, const QPainterPath& p, unsigned int rgb, QGraphicsItem* parent)
 {
@@ -17083,7 +17082,8 @@ void embPolyline_init(float x, float y, QPainterPath *p, unsigned int rgb, int l
     setPen(objectPen());
 }
 
-int embPolyline_findIndex(const EmbVector& point)
+int
+embPolyline_findIndex(const EmbVector& point)
 {
     int elemCount = normalPath.elementCount();
     //NOTE: Points here are in item coordinates
@@ -17096,16 +17096,8 @@ int embPolyline_findIndex(const EmbVector& point)
     return -1;
 }
 
-QPainterPath embPolyline_objectSavePath()
-{
-    float s = scale();
-    QTransform trans;
-    trans.rotate(rotation());
-    trans.scale(s,s);
-    return trans.map(normalPath);
-}
-
-void rect_init(EmbRect rect, unsigned int rgb, PenStyle lineType)
+void
+rect_init(EmbRect rect, unsigned int rgb, PenStyle lineType)
 {
     setData(OBJ_TYPE, type);
     setData(OBJ_NAME, "Rectangle");
@@ -17119,27 +17111,30 @@ void rect_init(EmbRect rect, unsigned int rgb, PenStyle lineType)
     setPen(objectPen());
 }
 
-void rect_setRect(float x, float y, float w, float h)
+EmbVector
+rect_topLeft()
 {
-    setPos(x, y);
-    setRect(0, 0, w, h);
-    updatePath();
-}
-
-EmbVector rect_objectTopLeft()
-{
+    EmbVector v;
+    v.x = 0.0;
+    v.y = 0.0;
     float alpha = radians(rotation());
     EmbVector tl = rect().topLeft() * scale();
     EmbVector ptlrot = emb_vector_rotate(t1, alpha);
     return scenePos() + ptlrot;
+    return v;
 }
 
-EmbVector rect_objectTopRight()
+EmbVector
+rect_topRight()
 {
+    EmbVector v;
+    v.x = 0.0;
+    v.y = 0.0;
     float alpha = radians(rotation());
     EmbVector tr = rect().topRight() * scale();
     EmbVector ptlrot = emb_vector_rotate(t1, alpha);
     return scenePos() + ptrrot;
+    return v;
 }
 */
 
@@ -17390,7 +17385,8 @@ void embEllipse_init(EmbEllipse ellipse, unsigned int rgb, int lineType)
 }
 */
 
-void embEllipse_setSize(float width, float height)
+void
+embEllipse_setSize(float width, float height)
 {
     printf("%f %f", width, height);
     /*
@@ -17402,7 +17398,8 @@ void embEllipse_setSize(float width, float height)
     */
 }
 
-void embEllipse_setRadiusMajor(float radius)
+void
+embEllipse_setRadiusMajor(float radius)
 {
     printf("%f", radius);
     /*
@@ -17410,7 +17407,8 @@ void embEllipse_setRadiusMajor(float radius)
     */
 }
 
-void embEllipse_setRadiusMinor(float radius)
+void
+embEllipse_setRadiusMinor(float radius)
 {
     printf("%f", radius);
     /*
@@ -17418,7 +17416,8 @@ void embEllipse_setRadiusMinor(float radius)
     */
 }
 
-void embEllipse_setDiameterMajor(EmbEllipse *ellipse, float diameter)
+void
+embEllipse_setDiameterMajor(EmbEllipse *ellipse, float diameter)
 {
     printf("%f %f", ellipse->radius.x, diameter);
     /*
@@ -17432,7 +17431,8 @@ void embEllipse_setDiameterMajor(EmbEllipse *ellipse, float diameter)
     */
 }
 
-void embEllipse_setDiameterMinor(EmbEllipse *ellipse, float diameter)
+void
+embEllipse_setDiameterMinor(EmbEllipse *ellipse, float diameter)
 {
     printf("%f %f", ellipse->center.x, diameter);
     /*
@@ -17553,7 +17553,7 @@ embRect_area(EmbRect rect)
 
 //NOTE: This void should be used to interpret various object types and save them as polylines for stitchOnly formats.
 /*
-void save_toPolyline(EmbPattern* pattern, const EmbVector& objPos, const QPainterPath& objPath, const std::string& layer, const QColor& color, const std::string& lineType, const std::string& lineWeight)
+void save_toPolyline(EmbPattern* pattern, const EmbVector& objPos, const QPainterPath& objPath, const char* layer, const QColor& color, const char* lineType, const char* lineWeight)
 {
     float startX = objPos.x();
     float startY = objPos.y();
@@ -17582,7 +17582,7 @@ void save_toPolyline(EmbPattern* pattern, const EmbVector& objPos, const QPainte
     emb_pattern_addPolylineAbs(pattern, polyObject);
 }
 
-void textSingle_TextSingleObject(const std::string& str, float x, float y, unsigned int rgb, QGraphicsItem* parent)
+void textSingle_TextSingleObject(const char* str, float x, float y, unsigned int rgb, QGraphicsItem* parent)
 {
     debug_message("TextSingleObject Constructor()");
     init(str, x, y, rgb, Qt::SolidLine); //TODO: getCurrentLineType
@@ -17603,7 +17603,7 @@ void textSingle_TextSingleObject(TextSingleObject* obj, QGraphicsItem* parent)
     }
 }
 
-void textSingle_init(const std::string& str, float x, float y, unsigned int rgb, int lineType)
+void textSingle_init(const char* str, float x, float y, unsigned int rgb, int lineType)
 {
     setData(OBJ_TYPE, type);
     setData(OBJ_NAME, "Single Line Text");
@@ -17631,7 +17631,7 @@ std::stringList text_single_objectTextJustifyList()
     return justifyList;
 }
 
-void textSingle_setText(const std::string& str)
+void textSingle_setText(const char* str)
 {
     objText = str;
     QPainterPath textPath;
@@ -17762,7 +17762,8 @@ void textSingle_setTextSize(float size)
     */
 }
 
-void textSingle_setTextStyle(char bold, char italic, char under, char strike, char over)
+void
+textSingle_setTextStyle(char bold, char italic, char under, char strike, char over)
 {
     printf("%d %d %d %d %d", bold, italic, under, strike, over);
     /*
@@ -17784,7 +17785,8 @@ void textSingle_setTextBold(char val)
     */
 }
 
-void textSingle_setTextItalic(char val)
+void
+textSingle_setTextItalic(char val)
 {
     printf("%d", val);
     /*
@@ -17793,7 +17795,8 @@ void textSingle_setTextItalic(char val)
     */
 }
 
-void textSingle_setTextUnderline(char val)
+void
+textSingle_setTextUnderline(char val)
 {
     printf("%d", val);
     /*
@@ -17802,7 +17805,8 @@ void textSingle_setTextUnderline(char val)
     */
 }
 
-void textSingle_setTextStrikeOut(char val)
+void
+textSingle_setTextStrikeOut(char val)
 {
     printf("%d", val);
     /*
@@ -17811,7 +17815,8 @@ void textSingle_setTextStrikeOut(char val)
     */
 }
 
-void textSingle_setTextOverline(char val)
+void
+textSingle_setTextOverline(char val)
 {
     printf("%d", val);
     /*
@@ -17820,7 +17825,8 @@ void textSingle_setTextOverline(char val)
     */
 }
 
-void textSingle_setTextBackward(char val)
+void
+textSingle_setTextBackward(char val)
 {
     printf("%d", val);
     /*
@@ -19818,3 +19824,1211 @@ emb_set_int(EmbGeometry *g, int id, int i)
         break;
     }
 }
+
+#define NUMBINS   10
+
+double epsilon = 0.000000001;
+
+double emb_included_angle(EmbGeometry *geometry);
+
+int
+emb_approx(EmbVector point1, EmbVector point2)
+{
+    return (emb_vector_distance(point1, point2) < epsilon);
+}
+
+/* FIXME */
+double
+emb_width(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_height(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_radius(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_radius_major(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_radius_minor(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_diameter_major(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_diameter_minor(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* FIXME */
+double
+emb_diameter(EmbGeometry *geometry)
+{
+    return 1.0;
+}
+
+/* . */
+EmbVector
+emb_quadrant(EmbGeometry *geometry, int degrees)
+{
+    EmbVector v;
+    EmbReal radius;
+    v.x = 0.0;
+    v.y = 0.0;
+    switch (geometry->type) {
+    case EMB_CIRCLE: {
+        v = geometry->object.circle.center;
+        radius = geometry->object.circle.radius;
+    }
+    case EMB_ELLIPSE: {
+        v = geometry->object.ellipse.center;
+        if (degrees % 180 == 0) {
+            radius = geometry->object.ellipse.radius.x;
+        }
+        else {
+            radius = geometry->object.ellipse.radius.y;
+        }
+    }
+    default:
+        break;
+    }
+    double rot = radians(/* rotation() + */ degrees);
+    v.x += radius * cos(rot);
+    v.y += radius * sin(rot);
+    return v;
+}
+
+/* . */
+double
+emb_angle(EmbGeometry *geometry)
+{
+    EmbVector v = emb_vector_subtract(geometry->object.line.end, geometry->object.line.start);
+    double angle = emb_vector_angle(v) /* - rotation() */;
+    return fmod(angle+360.0, 360.0);
+}
+
+/* . */
+double
+emb_start_angle(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        EmbVector center = emb_arc_center(*geometry);
+        EmbVector v = emb_vector_subtract(center, geometry->object.arc.start);
+        double angle = emb_vector_angle(v) /* - rotation() */;
+        return fmod(angle+360.0, 360.0);
+    }
+    default:
+        break;
+    }
+    return 0.0f;
+}
+
+/* . */
+double
+emb_end_angle(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        EmbVector center = emb_arc_center(*geometry);
+        EmbVector v = emb_vector_subtract(center, geometry->object.arc.end);
+        double angle = emb_vector_angle(v) /* - rotation() */;
+        return fmod(angle+360.0, 360.0);
+    }
+    default:
+        break;
+    }
+    return 0.0f;
+}
+
+/* . */
+double
+emb_arc_length(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        return radians(emb_included_angle(geometry)) * emb_radius(geometry);
+    }
+    default:
+        break;
+    }
+    return 0.0;
+}
+
+/* . */
+double
+emb_area(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        /* Area of a circular segment */
+        double r = emb_radius(geometry);
+        double theta = radians(emb_included_angle(geometry));
+        return ((r*r)/2) * (theta - sin(theta));
+    }
+    case EMB_CIRCLE: {
+        double r = geometry->object.circle.radius;
+        return embConstantPi * r * r;
+    }
+    case EMB_IMAGE:
+    case EMB_RECT:
+    default:
+        break;
+    }
+    return fabs(emb_width(geometry) * emb_height(geometry));
+}
+
+/* . */
+double
+emb_chord(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        return emb_vector_distance(geometry->object.arc.start, geometry->object.arc.end);
+    }
+    default:
+        break;
+    }
+    return 0.0;
+}
+
+/* . */
+double
+emb_included_angle(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        double chord = emb_chord(geometry);
+        double rad = emb_radius(geometry);
+        if (chord <= 0 || rad <= 0) {
+            /* Prevents division by zero and non-existant circles. */
+            return 0;
+        }
+
+        /* NOTE: Due to floating point rounding errors, we need to clamp the quotient so it is in the range [-1, 1]
+         *       If the quotient is out of that range, then the result of asin() will be NaN.
+         */
+        double quotient = chord/(2.0*rad);
+        quotient = EMB_MIN(1.0, quotient);
+        quotient = EMB_MAX(0.0, quotient); /* NOTE: 0 rather than -1 since we are enforcing a positive chord and radius */
+        return degrees(2.0*asin(quotient)); /* Properties of a Circle - Get the Included Angle - Reference: ASD9 */
+    }
+    default:
+        break;
+    }
+    return 0.0;
+}
+
+/* . */
+bool
+emb_clockwise(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        /* NOTE: Y values are inverted here on purpose. */
+        geometry->object.arc.start.y = -geometry->object.arc.start.y;
+        geometry->object.arc.mid.y = -geometry->object.arc.start.y;
+        geometry->object.arc.end.y = -geometry->object.arc.end.y;
+        if (emb_arc_clockwise(*geometry)) {
+            return true;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    return false;
+}
+
+/* . */
+void
+emb_set_start_angle(EmbGeometry *geometry, double angle)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        /* TODO: ArcObject setObjectStartAngle */
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_end_angle(EmbGeometry *geometry, double angle)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        /* TODO: ArcObject setObjectEndAngle */
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_start_point(EmbGeometry *geometry, EmbVector point)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        geometry->object.arc.start = point;
+        /* calculateData(); */
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_mid_point(EmbGeometry *geometry, EmbVector point)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        geometry->object.arc.mid = point;
+        /* calculateData(); */
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_end_point(EmbGeometry *geometry, EmbVector point)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        geometry->object.arc.end = point;
+        /* calculateData(); */
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_radius(EmbGeometry *geometry, double radius)
+{
+    switch (geometry->type) {
+    case EMB_ARC: {
+        /* geometry->object.arc = emb_arc_set_radius(geometry->object.arc, radius); */
+        break;
+    }
+    case EMB_CIRCLE:
+        geometry->object.circle.radius = radius;
+        break;
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_diameter(EmbGeometry *geometry, double diameter)
+{
+    switch (geometry->type) {
+    case EMB_CIRCLE: {
+        geometry->object.circle.radius = diameter / 2.0;
+        /* FIXME: updatePath(); */
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_area(EmbGeometry *geometry, double area)
+{
+    switch (geometry->type) {
+    case EMB_CIRCLE: {
+        double radius = sqrt(area / embConstantPi);
+        emb_set_radius(geometry, radius);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_circumference(EmbGeometry *geometry, double circumference)
+{
+    switch (geometry->type) {
+    case EMB_CIRCLE: {
+        double diameter = circumference / embConstantPi;
+        emb_set_diameter(geometry, diameter);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_radius_major(EmbGeometry *geometry, double radius)
+{
+    emb_set_diameter_major(geometry, radius*2.0);
+}
+
+/* . */
+void
+emb_set_radius_minor(EmbGeometry *geometry, double radius)
+{
+    emb_set_diameter_minor(geometry, radius*2.0);
+}
+
+/* . */
+void
+emb_set_diameter_major(EmbGeometry *geometry, double diameter)
+{
+    switch (geometry->type) {
+    case EMB_ELLIPSE:
+        /* FIXME: Identify longer axis and replace. */
+        geometry->object.ellipse.radius.x = diameter;
+        break;
+    default:
+        break;
+    }
+}
+
+/* . */
+void
+emb_set_diameter_minor(EmbGeometry *geometry, double diameter)
+{
+    switch (geometry->type) {
+    case EMB_ELLIPSE:
+        /* FIXME: Identify longer axis and replace. */
+        geometry->object.ellipse.radius.x = diameter;
+        break;
+    default:
+        break;
+    }
+}
+
+
+#if 0
+/* . */
+QColor
+emb_color(EmbGeometry *geometry)
+{
+    return data.objPen.color();
+}
+
+/* . */
+QRgb
+emb_color_rgb(EmbGeometry *geometry)
+{
+    return data.objPen.color().rgb();
+}
+
+/* . */
+Qt::PenStyle
+emb_line_type(EmbGeometry *geometry)
+{
+    return data.objPen.style();
+}
+
+/* . */
+double
+emb_line_weight(EmbGeometry *geometry)
+{
+    return data.lwtPen.widthF();
+}
+
+/* . */
+QPainterPath
+emb_path(EmbGeometry *geometry)
+{
+    return path();
+}
+
+/* . */
+EmbVector
+emb_rubber_point(EmbGeometry *geometry, const char *key)
+{
+    return ;
+}
+
+/* . */
+QString
+emb_rubber_text(EmbGeometry *geometry, const char *key)
+{
+    return ;
+}
+
+/* . */
+EmbVector
+emb_pos(EmbGeometry *geometry)
+{
+    return scenePos();
+}
+
+/* . */
+double
+emb_x(EmbGeometry *geometry)
+{
+    return scenePos().x();
+}
+
+/* . */
+double
+emb_y(EmbGeometry *geometry)
+{
+    return scenePos().y();
+}
+
+/* . */
+EmbVector
+emb_center(EmbGeometry *geometry)
+{
+    return ;
+}
+
+/* . */
+double
+emb_center_x(EmbGeometry *geometry)
+{
+    return scenePos().x();
+}
+
+/* . */
+double
+emb_center_y(EmbGeometry *geometry)
+{
+    return scenePos().y();
+}
+
+/* . */
+double
+emb_radius(EmbGeometry *geometry)
+{
+    return rect().width()/2.0*scale();
+}
+
+/* . */
+double
+emb_diameter(EmbGeometry *geometry)
+{
+    return rect().width()*scale();
+}
+#endif
+
+/* . */
+double
+emb_circumference(EmbGeometry *geometry)
+{
+    switch (geometry->type) {
+    case EMB_CIRCLE: {
+        return 2.0 * embConstantPi * geometry->object.circle.radius;
+    }
+    default:
+        break;
+    }
+    return 1.0;
+}
+
+#if 0
+/* . */
+EmbVector
+emb_end_point_1(EmbGeometry *geometry)
+{
+    return emb_pos(geometry);
+}
+
+/* . */
+EmbVector
+emb_end_point_2(EmbGeometry *geometry)
+{
+    return emb_pos(geometry);
+}
+
+/* . */
+EmbVector
+emb_start_point(EmbGeometry *geometry)
+{
+    return ;
+}
+
+/* . */
+EmbVector
+emb_mid_point(EmbGeometry *geometry)
+{
+    return ;
+}
+
+/* . */
+EmbVector
+emb_end_point(EmbGeometry *geometry)
+{
+    return ;
+}
+
+/* . */
+EmbVector
+emb_delta(EmbGeometry *geometry)
+{
+    return objectEndPoint2(geometry) - objectEndPoint1(geometry);
+}
+
+/* . */
+EmbVector
+top_left(EmbGeometry *geometry)
+{
+}
+
+/* . */
+EmbVector
+top_right(EmbGeometry *geometry)
+{
+}
+
+/* . */
+EmbVector
+bottom_left(EmbGeometry *geometry)
+{
+}
+
+/* . */
+EmbVector
+bottom_right(EmbGeometry *geometry)
+{
+}
+
+/* . */
+void
+update_rubber(QPainter* painter);
+{
+}
+
+/* . */
+void
+update_rubber_grip(QPainter *painter);
+{
+}
+
+/* . */
+void
+update_leader(EmbGeometry *geometry);
+{
+}
+
+/* . */
+void
+update_path(EmbGeometry *geometry);
+{
+}
+
+/* . */
+void
+update_path(const QPainterPath& p);
+{
+}
+
+/* . */
+void
+update_arc_rect(double radius);
+{
+}
+
+/* . */
+double
+emb_length(EmbGeometry *geometry)
+{
+    return line().length()*scale();
+}
+
+/* . */
+void
+emb_set_end_point_1(EmbGeometry *geometry, const QPointF& endPt1)
+{
+}
+
+/* . */
+void
+emb_set_end_point_1(EmbGeometry *geometry, double x1, double y1)
+{
+}
+
+/* . */
+void
+emb_set_end_point_2(EmbGeometry *geometry, QPointF endPt2)
+{
+}
+
+/* . */
+void
+emb_set_end_point_2(EmbGeometry *geometry, double x2, double y2)
+{
+}
+
+/* . */
+void
+emb_set_X1(double x)
+{
+    emb_set_EndPoint1(x, objectEndPoint1().y());
+}
+
+/* . */
+void
+emb_set_Y1(double y)
+{
+    emb_set_EndPoint1(objectEndPoint1().x(), y);
+}
+
+/* . */
+void emb_set_X2(double x)
+{
+    emb_set_EndPoint2(x, objectEndPoint2().y());
+}
+
+/* . */
+void
+emb_set_Y2(double y)
+{
+    emb_set_EndPoint2(objectEndPoint2().x(), y);
+}
+
+/* . */
+QRectF
+emb_rect(EmbGeometry *geometry)
+{
+    return path().boundingRect();
+}
+
+/* . */
+void
+emb_setRect(const QRectF& r)
+{
+    QPainterPath p;
+    p.addRect(r);
+    setPath(p);
+}
+
+/* . */
+void
+emb_setRect(double x, double y, double w, double h)
+{
+    QPainterPath p;
+    p.addRect(x,y,w,h);
+    setPath(p);
+}
+
+/* . */
+QLineF line(EmbGeometry *geometry)
+{
+    return data.objLine;
+}
+
+/* . */
+void
+emb_setLine(const QLineF& li)
+{
+    QPainterPath p;
+    p.moveTo(li.p1());
+    p.lineTo(li.p2());
+    setPath(p);
+    data.objLine = li;
+}
+
+/* . */
+void
+emb_set_line(double x1, double y1, double x2, double y2)
+{
+    QPainterPath p;
+    p.moveTo(x1, y1);
+    p.lineTo(x2, y2);
+    setPath(p);
+    data.objLine.setLine(x1,y1,x2,y2);
+}
+
+/* . */
+void
+emb_set_pos(QPointF point)
+{
+    setPos(point.x(), point.y());
+}
+
+/* . */
+void
+emb_set_pos(EmbGeometry *geometry, double x, double y)
+{
+    setPos(x, y);
+}
+
+/* . */
+void
+emb_set_x(EmbGeometry *geometry, double x)
+{
+    emb_set_pos(geometry, x, emb_y(geometry));
+}
+
+/* . */
+void
+emb_set_y(EmbGeometry *geometry, double y)
+{
+    emb_set_pos(geometry, emb_x(geometry), y);
+}
+
+/* . */
+void emb_set_Rect(double x1, double y1, double x2, double y2)
+{
+}
+
+/* . */
+virtual void vulcanize()
+{
+}
+
+/* . */
+virtual QList<QPointF> allGripPoints(EmbGeometry *geometry)
+{
+}
+
+/* . */
+virtual QPointF mouseSnapPoint(const QPointF& mousePoint)
+{
+}
+
+/* . */
+virtual void gripEdit(const QPointF& before, const QPointF& after)
+{
+}
+
+/* . */
+virtual QRectF boundingRect(EmbGeometry *geometry)
+{
+}
+
+/* . */
+virtual QPainterPath shape(EmbGeometry *geometry)
+{ return path(); }
+
+/* . */
+void
+emb_set_Color(const QColor& color)
+{
+}
+
+/* . */
+void
+emb_set_ColorRGB(QRgb rgb)
+{
+}
+
+/* . */
+void
+emb_set_LineType(Qt::PenStyle lineType)
+{
+}
+
+/* . */
+void
+emb_set_LineWeight(double lineWeight)
+{
+}
+
+/* . */
+void
+emb_set_Path(const QPainterPath& p)
+{
+    setPath(p);
+}
+
+/* . */
+void
+emb_set_rubber_mode(int mode)
+{
+    data.objRubberMode = mode;
+}
+
+/* . */
+void
+emb_set_rubber_point(const QString& key, const QPointF& point)
+{
+    data.objRubberPoints.insert(key, point);
+}
+
+/* . */
+void
+emb_set_rubber_text(const QString& key, const QString& txt)
+{
+    data.objRubberTexts.insert(key, txt);
+}
+
+/* . */
+void
+draw_rubber_line(const QLineF& rubLine, QPainter* painter = 0, const char* colorFromScene = 0)
+{
+}
+
+/* . */
+QPen
+lineWeightPen(EmbGeometry *geometry)
+{
+    return data.lwtPen;
+}
+
+/* . */
+void emb_real_render(QPainter* painter, const QPainterPath& renderPath)
+{
+}
+
+/* . */
+void
+emb_set_center(EmbVector point)
+{
+}
+
+/* . */
+void
+emb_set_center(const QPointF& center)
+{
+}
+
+/* . */
+void
+emb_set_center_x(EmbGeometry *geometry, double centerX)
+{
+}
+
+/* . */
+void
+emb_set_center_y(EmbGeometry *geometry, double centerY)
+{
+}
+
+/* . */
+void
+emb_calculate_data(EmbGeometry *geometry)
+{
+}
+
+/* . */
+void
+emb_set_size(EmbGeometry *geometry, double width, double height)
+{
+}
+
+/* . */
+QPainterPath
+emb_object_copy_path(EmbGeometry *geometry)
+{
+}
+
+/* . */
+QPainterPath
+emb_object_save_path(EmbGeometry *geometry)
+{
+}
+
+/* . */
+QList<QPainterPath>
+emb_object_save_path_list(EmbGeometry *geometry)
+{
+    return subPathList();
+}
+
+/* . */
+QList<QPainterPath>
+emb_sub_path_list(EmbGeometry *geometry)
+{
+    return;
+}
+
+#endif
+
+/* . */
+EmbVector
+scale_and_rotate(EmbVector v, double scale, double angle)
+{
+    EmbVector w;
+    double rot = radians(angle);
+    double cosRot = cos(rot);
+    double sinRot = sin(rot);
+    w.x = v.x * scale;
+    w.y = v.y * scale;
+    w.x = w.x * cosRot - w.y * sinRot;
+    w.y = w.x * sinRot + w.y * cosRot;
+    return w;    
+}
+
+
+/* Get the position as a vector from the stitch. */
+EmbVector
+emb_st_pos(EmbStitch st)
+{
+    return emb_vector(st.x, st.y);
+}
+
+/* Length of stitch starting of "prev_st" and ending at "st". */
+double
+emb_stitch_length(EmbStitch prev_st, EmbStitch st)
+{
+    EmbVector pos = emb_st_pos(st);
+    EmbVector prev_pos = emb_st_pos(prev_st);
+    double length = emb_vector_distance(pos, prev_pos);
+    return length;
+}
+
+/* Returns the number of real stitches in a pattern.
+ * We consider SEQUIN to be a real stitch in this count.
+ */
+uint32_t
+emb_pattern_real_count(EmbPattern *pattern)
+{
+    int i;
+    uint32_t total = 0;
+    for (i = 0; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        if (!(st.flags & (JUMP | TRIM))) {
+            total++;
+        }
+    }
+    return total;
+}
+
+/* The length of the longest stitch in the pattern. */
+double
+emb_pattern_longest_stitch(EmbPattern *pattern)
+{
+    if (pattern->stitch_list->count < 2) {
+        return;
+    }
+
+    int i;
+    double max_stitch = 0.0;
+    EmbStitch prev_st = pattern->stitch_list->stitch[0];
+    for (i = 1; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        if ((prev_st.flags == NORMAL) && (st.flags == NORMAL)) {
+            double length = emb_stitch_length(st, prev_st);
+            if (length > max_stitch) {
+                max_stitch = length;
+            }
+        }
+        prev_st = st;
+    }
+    return max_stitch;    
+}
+
+/* The length of the shortest stitch in the pattern. */
+double
+emb_pattern_shortest_stitch(EmbPattern *pattern)
+{
+    if (pattern->stitch_list->count < 2) {
+        return;
+    }
+
+    int i;
+    double min_stitch = 1.0e10;
+    EmbStitch prev_st = pattern->stitch_list->stitch[0];
+    for (i = 1; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        if ((prev_st.flags == NORMAL) && (st.flags == NORMAL)) {
+            double length = emb_stitch_length(st, prev_st);
+            if (length < min_stitch) {
+                min_stitch = length;
+            }
+        }
+        prev_st = st;
+    }
+    return min_stitch;    
+}
+
+/* Returns the number of stitches in a pattern that are of any of the types
+ * or-ed together in "flag". For example to count the total number of
+ * TRIM and STOP stitches use:
+ *
+ *     emb_pattern_count_type(pattern, TRIM | STOP);
+ */
+uint32_t
+emb_pattern_count_type(EmbPattern *pattern, uint32_t flag)
+{
+    int i;
+    uint32_t total = 0;
+    for (i = 0; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        if (st.flags & flag) {
+            total++;
+        }
+    }
+    return total;
+}
+
+/* . */
+void
+emb_length_histogram(EmbPattern *pattern, int *bins)
+{
+    if (pattern->stitch_list->count < 2) {
+        return;
+    }
+
+    int i;
+    for (i = 0; i <= NUMBINS; i++) {
+        bins[i] = 0;
+    }
+
+    double max_stitchlength = emb_pattern_longest_stitch(pattern);
+    EmbStitch prev_st = pattern->stitch_list->stitch[0];
+    for (i = 1; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        if ((prev_st.flags == NORMAL) && (st.flags == NORMAL)) {
+            double length = emb_stitch_length(st, prev_st);
+            int bin_number = (int)floor(NUMBINS*length/max_stitchlength);
+            bins[bin_number]++;
+        }
+        prev_st = st;
+    }
+}
+
+/* . */
+void
+emb_color_histogram(EmbPattern *pattern, int **bins)
+{
+    if (pattern->stitch_list->count < 2) {
+        return;
+    }
+
+    int i, j;
+    for (j = 0; j < pattern->thread_list->count; j++)
+    for (i = 0; i <= NUMBINS; i++) {
+        bins[j][i] = 0;
+    }
+
+    double max_stitchlength = emb_pattern_longest_stitch(pattern);
+    EmbStitch prev_st = pattern->stitch_list->stitch[0];
+    for (i = 1; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        /* Can't count first normal stitch. */
+        if ((prev_st.flags == NORMAL) && (st.flags == NORMAL)) {
+            double length = emb_stitch_length(st, prev_st);
+            int bin_number = (int)floor(NUMBINS*length/max_stitchlength);
+            bins[0][bin_number]++;
+        }
+        prev_st = st;
+    }
+}
+
+/* . */
+double
+emb_total_thread_length(EmbPattern *pattern)
+{
+    if (pattern->stitch_list->count < 2) {
+        return 0.0;
+    }
+
+    int i;
+    double total = 0.0;
+    EmbStitch prev_st = pattern->stitch_list->stitch[0];
+    for (i = 1; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        /* Can't count first normal stitch. */
+        if (st.flags == NORMAL) {
+            total += emb_stitch_length(st, prev_st);
+        }
+        prev_st = st;
+    }
+    return total;
+}
+
+/* FIXME. */
+double
+emb_total_thread_of_color(EmbPattern *pattern, int thread_index)
+{
+    if (pattern->stitch_list->count < 2) {
+        return 0.0;
+    }
+
+    int i;
+    double total = 0.0;
+    EmbStitch prev_st = pattern->stitch_list->stitch[0];
+    for (i = 1; i < pattern->stitch_list->count; i++) {
+        EmbStitch st = pattern->stitch_list->stitch[i];
+        /* Can't count first normal stitch. */
+        if (st.color == thread_index)
+        if ((prev_st.flags == NORMAL) && (st.flags == NORMAL)) {
+            total += emb_stitch_length(st, prev_st);
+        }
+        prev_st = st;
+    }
+    return total;
+}
+
+/* TODO: test this. */
+char *
+emb_get_svg_token(char *svg, char token[MAX_STRING_LENGTH])
+{
+    if (*svg == ' ') {
+        svg++;
+    }
+    if (*svg == 0) {
+        return NULL;
+    }
+    int i;
+    for (i=0; i < MAX_STRING_LENGTH; i++) {
+        token[i] = svg[i];
+        if (token[i] == ' ') {
+            token[i] = 0;
+            svg += i;
+            return svg;
+        }
+    }
+    return NULL;
+}
+
+/* */
+char *
+emb_get_svg_vector(char *svg, EmbVector *v)
+{
+    char token[MAX_STRING_LENGTH];
+    svg = emb_get_svg_token(svg, token);
+    if (!svg) {
+        return NULL;
+    }
+    v->x = atof(token);
+    svg = emb_get_svg_token(svg, token);
+    if (!svg) {
+        return NULL;
+    }
+    v->y = atof(token);
+    return svg;
+}
+

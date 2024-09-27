@@ -144,6 +144,7 @@ extern "C" {
 
 #define EMB_MAX_LAYERS                         10
 #define MAX_THREADS                           256
+#define MAX_STRING_LENGTH                     200
 #define EMBFORMAT_MAXEXT                        3
 /* maximum length of extension without dot */
 #define EMBFORMAT_MAXDESC                      50
