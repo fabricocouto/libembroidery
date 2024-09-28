@@ -17,6 +17,12 @@
 
 #include "embroidery.h"
 
+#define NUMBINS   10
+
+double epsilon = 0.000000001;
+
+double emb_included_angle(EmbGeometry *geometry);
+
 /* System-specific functions.
  *
  * Only uses source from this directory or standard C libraries,
@@ -15766,32 +15772,6 @@ emb_arc_includedAngle(EmbArc arc)
     return 0.0;
 }
 
-void emb_arc_paint(void)
-{
-    // QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* widget
-    /*
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    float startAngle = (objectStartAngle() + rotation())*16;
-    float spanAngle = objectIncludedAngle()*16;
-
-    if (objectClockwise())
-        spanAngle = -spanAngle;
-
-    float rad = objectRadius();
-    EmbRect paintRect(-rad, -rad, rad*2.0, rad*2.0);
-    painter->drawArc(paintRect, startAngle, spanAngle);
-    */
-}
-
 void set_object_color(EmbGeometry *obj, EmbColor color)
 {
     obj->color = color;
@@ -15880,74 +15860,14 @@ Base_objectRubberText(EmbGeometry *obj, const char *key)
 }
 
 /*
-void embGeometry_drawRubberLine(const EmbLine& rubLine, QPainter* painter, const char* colorFromScene)
-{
-    if (painter) {
-        QGraphicsScene* objScene = scene();
-        if (!objScene) return;
-        QPen colorPen = objPen;
-        colorPen.setColor(QColor(objScene->property(colorFromScene).toUInt()));
-        painter->setPen(colorPen);
-        painter->drawLine(rubLine);
-        painter->setPen(objPen);
-    }
-}
-
-void embGeometry_realRender(QPainter* painter, const QPainterPath& renderPath)
-{
-    QColor color1 = objectColor();       //lighter color
-    QColor color2  = color1.darker(150); //darker color
-
-    //If we have a dark color, lighten it
-    int darkness = color1.lightness();
-    int threshold = 32; //TODO: This number may need adjusted or maybe just add it to settings.
-    if (darkness < threshold) {
-        color2 = color1;
-        if (!darkness) { color1 = QColor(threshold, threshold, threshold); } //lighter() does not affect pure black
-        else          { color1 = color2.lighter(100 + threshold); }
-    }
-
-    int count = renderPath.elementCount();
-    for (int i = 0; i < count-1; ++i) {
-        QPainterPath::Element elem = renderPath.elementAt(i);
-        QPainterPath::Element next = renderPath.elementAt(i+1);
-
-        if (next.isMoveTo()) continue;
-
-        QPainterPath elemPath;
-        elemPath.moveTo(elem.x, elem.y);
-        elemPath.lineTo(next.x, next.y);
-
-        QPen renderPen(QColor(0,0,0,0));
-        renderPen.setWidthF(0);
-        painter->setPen(renderPen);
-        QPainterPathStroker stroker;
-        stroker.setWidth(0.35);
-        stroker.setCapStyle(RoundCap);
-        stroker.setJoinStyle(RoundJoin);
-        QPainterPath realPath = stroker.createStroke(elemPath);
-        painter->drawPath(realPath);
-
-        QLinearGradient grad(elemPath.pointAtPercent(0.5), elemPath.pointAtPercent(0.0));
-        grad.setColorAt(0, color1);
-        grad.setColorAt(1, color2);
-        grad.setSpread(QGradient::ReflectSpread);
-
-        painter->fillPath(realPath, QBrush(grad));
-    }
-}
-
 void emb_circle_main()
 {
     initCommand();
     clearSelection();
     view.ui_mode = "CIRCLE_MODE_1P_RAD";
-    global.x1 = NaN;
-    global.y1 = NaN;
-    global.x2 = NaN;
-    global.y2 = NaN;
-    global.x3 = NaN;
-    global.y3 = NaN;
+    global.point1 = emb_vector(0.0, 0.0);
+    global.point2 = emb_vector(0.0, 0.0);
+    global.point3 = emb_vector(0.0, 0.0);
     setPromptPrefix(translate("Specify center point for circle or [3P/2P/Ttr (tan tan radius)]: "));
 }
 */
@@ -16125,7 +16045,8 @@ emb_circle_prompt(const char *str)
 }
 
 /*
-void emb_circle_CircleObject(EmbVector center, float radius, unsigned int rgb)
+void
+emb_circle_CircleObject(EmbVector center, float radius, unsigned int rgb)
 {
     if (n_views == 0) {
         return;
@@ -16164,32 +16085,19 @@ void emb_circle_setDiameter(EmbCircle *circle, float diameter)
 }
 */
 
-void emb_circle_setArea(EmbCircle *circle, float area)
+void
+emb_circle_setArea(EmbCircle *circle, float area)
 {
     circle->radius = sqrt(area / embConstantPi);
 }
 
-void emb_circle_setCircumference(EmbCircle *circle, float circumference)
+void
+emb_circle_setCircumference(EmbCircle *circle, float circumference)
 {
     circle->radius = circumference / (2.0*embConstantPi);
 }
 
 /*
-void emb_circle_paint(QPainter* painter)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawEllipse(rect());
-}
-
 void dim_leader_init(EmbLine line, unsigned int rgb, int lineType)
 {
     setData(OBJ_TYPE, type);
@@ -16341,32 +16249,6 @@ void dimleader_updateLeader()
     lineStylePath.moveTo(ap0);
     lineStylePath.lineTo(lp0);
 }
-
-void dimleader_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) {
-        return;
-    }
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected) {
-        paintPen.setStyle(Qt::DashLine);
-    }
-    if (objScene->property("ENABLE_LWT").toBool()) {
-        paintPen = lineWeightPen();
-    }
-    painter->setPen(paintPen);
-
-    painter->drawPath(lineStylePath);
-    painter->drawPath(arrowStylePath);
-
-    if (filled) {
-        painter->fillPath(arrowStylePath, objectColor());
-    }
-}
 */
 
 void embEllipse_main()
@@ -16382,105 +16264,6 @@ void embEllipse_main()
     global.x3 = NaN;
     global.y3 = NaN;
     setPromptPrefix(translate("Specify first axis start point or [Center]: "));
-    */
-}
-
-void embEllipse_click(float x, float y)
-{
-    printf("%f %f", x, y);
-    /*
-    if (view.ui_mode == MODE_MAJORDIAMETER_MINORRADIUS) {
-        if (isnan(global.x1)) {
-            global.x1 = x;
-            global.y1 = y;
-            addRubber("ELLIPSE");
-            setRubberMode("ELLIPSE_LINE");
-            setRubberPoint("ELLIPSE_LINE_POINT1", global.x1, global.y1);
-            appendPromptHistory();
-            setPromptPrefix(translate("Specify first axis end point: "));
-        }
-        else if (isnan(global.x2)) {
-            global.x2 = x;
-            global.y2 = y;
-            global.cx = (global.x1 + global.x2)/2.0;
-            global.cy = (global.y1 + global.y2)/2.0;
-            global.width = calculateDistance(global.x1, global.y1, global.x2, global.y2);
-            global.rot = calculateAngle(global.x1, global.y1, global.x2, global.y2);
-            setRubberMode("ELLIPSE_MAJORDIAMETER_MINORRADIUS");
-            setRubberPoint("ELLIPSE_AXIS1_POINT1", global.x1, global.y1);
-            setRubberPoint("ELLIPSE_AXIS1_POINT2", global.x2, global.y2);
-            setRubberPoint("ELLIPSE_CENTER", global.cx, global.cy);
-            setRubberPoint("ELLIPSE_WIDTH", global.width, 0);
-            setRubberPoint("ELLIPSE_ROT", global.rot, 0);
-            appendPromptHistory();
-            setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
-        }
-        else if (isnan(global.x3)) {
-            global.x3 = x;
-            global.y3 = y;
-            global.height = perpendicularDistance(global.x3, global.y3, global.x1, global.y1, global.x2, global.y2)*2.0;
-            setRubberPoint("ELLIPSE_AXIS2_POINT2", global.x3, global.y3);
-            vulcanize();
-            appendPromptHistory();
-            endCommand();
-        }
-        else {
-            error("ELLIPSE", translate("This should never happen."));
-        }
-    }
-    else if (view.ui_mode == MODE_MAJORRADIUS_MINORRADIUS) {
-        if (isnan(global.x1)) {
-            global.x1 = x;
-            global.y1 = y;
-            global.cx = global.x1;
-            global.cy = global.y1;
-            addRubber("ELLIPSE");
-            setRubberMode("ELLIPSE_LINE");
-            setRubberPoint("ELLIPSE_LINE_POINT1", global.x1, global.y1);
-            setRubberPoint("ELLIPSE_CENTER", global.cx, global.cy);
-            appendPromptHistory();
-            setPromptPrefix(translate("Specify first axis end point: "));
-        }
-        else if (isnan(global.x2)) {
-            global.x2 = x;
-            global.y2 = y;
-            global.width = calculateDistance(global.cx, global.cy, global.x2, global.y2)*2.0;
-            global.rot = calculateAngle(global.x1, global.y1, global.x2, global.y2);
-            setRubberMode("ELLIPSE_MAJORRADIUS_MINORRADIUS");
-            setRubberPoint("ELLIPSE_AXIS1_POINT2", global.x2, global.y2);
-            setRubberPoint("ELLIPSE_WIDTH", global.width, 0);
-            setRubberPoint("ELLIPSE_ROT", global.rot, 0);
-            appendPromptHistory();
-            setPromptPrefix(translate("Specify second axis end point or [Rotation]: "));
-        }
-        else if (isnan(global.x3)) {
-            global.x3 = x;
-            global.y3 = y;
-            global.height = perpendicularDistance(global.x3, global.y3, global.cx, global.cy, global.x2, global.y2)*2.0;
-            setRubberPoint("ELLIPSE_AXIS2_POINT2", global.x3, global.y3);
-            vulcanize();
-            appendPromptHistory();
-            endCommand();
-        }
-        else {
-            error("ELLIPSE", translate("This should never happen."));
-        }
-    }
-    else if (view.ui_mode == MODE_ELLIPSE_ROTATION) {
-        if (isnan(global.x1)) {
-            error("ELLIPSE", translate("This should never happen."));
-        }
-        else if (isnan(global.x2)) {
-            error("ELLIPSE", translate("This should never happen."));
-        }
-        else if (isnan(global.x3)) {
-            float angle = calculateAngle(global.cx, global.cy, x, y);
-            global.height = cos(angle*Math.PI/180.0)*global.width;
-            addEllipse(global.cx, global.cy, global.width, global.height, global.rot, false);
-            appendPromptHistory();
-            endCommand();
-        }
-    }
     */
 }
 
@@ -16702,22 +16485,6 @@ EmbVector image_objectBottomRight()
     return scenePos() + pbrrot;
 }
 
-void
-image_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawRect(rect());
-}
-
 //Command: Line
 
 float global = {}; //Required
@@ -16738,33 +16505,6 @@ line_main()
     global.prevX = NaN;
     global.prevY = NaN;
     setPromptPrefix(translate("Specify first point: "));
-}
-
-void
-line_click(EmbVector p)
-{
-    if (global.firstRun) {
-        global.firstRun = false;
-        global.firstX = p.x;
-        global.firstY = p.y;
-        global.prevX = p.x;
-        global.prevY = p.y;
-        addRubber("LINE");
-        setRubberMode("LINE");
-        setRubberPoint("LINE_START", global.firstX, global.firstY);
-        appendPromptHistory();
-        setPromptPrefix(translate("Specify next point or [Undo]: "));
-    }
-    else {
-        setRubberPoint("LINE_END", x, y);
-        vulcanize();
-        addRubber("LINE");
-        setRubberMode("LINE");
-        setRubberPoint("LINE_START", x, y);
-        appendPromptHistory();
-        global.prevX = x;
-        global.prevY = y;
-    }
 }
 
 void
@@ -16878,30 +16618,6 @@ line_objectAngle()
     return std::fmodf(line().angle() - rotation(), 360.0);
 }
 
-void
-line_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  {
-        paintPen.setStyle(Qt::DashLine);
-    }
-    if (objScene->property(ENABLE_LWT).toBool()) {
-        paintPen = lineWeightPen();
-    }
-    painter->setPen(paintPen);
-
-    if (objectRubberMode() != OBJ_RUBBER_LINE) painter->drawLine(line());
-
-    if (objScene->property(ENABLE_LWT).toBool() && objScene->property("ENABLE_REAL").toBool()) {
-        realRender(painter, path());
-    }
-}
-
 path_PathObject(float x, float y, const QPainterPath p, unsigned int rgb, QGraphicsItem* parent)
 {
     debug_message("PathObject Constructor()");
@@ -16933,21 +16649,6 @@ void path_init(float x, float y, const QPainterPath& p, unsigned int rgb, int li
     setPen(objPen);
 }
 
-void path_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawPath(objectPath());
-}
-
 void point_init(float x, float y, unsigned int rgb, int lineType)
 {
     setData(OBJ_TYPE, type);
@@ -16961,21 +16662,6 @@ void point_init(float x, float y, unsigned int rgb, int lineType)
     setLineType(lineType);
     setLineWeight(0.35); //TODO: pass in proper lineweight
     setPen(objPen);
-}
-
-void point_paint(QPainter* painter, QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(Qt::DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    painter->drawPoint(0,0);
 }
 
 void
@@ -17011,27 +16697,6 @@ emb_polygon_init(float x, float y, const QPainterPath& p, unsigned int rgb, PenS
     setLineType(lineType);
     setLineWeight(0.35); //TODO: pass in proper lineweight
     setPen(objectPen());
-}
-
-void
-emb_polygon_paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    QGraphicsScene* objScene = scene();
-    if (!objScene) return;
-
-    QPen paintPen = pen();
-    painter->setPen(paintPen);
-    updateRubber(painter);
-    if (option->state & QStyle::State_Selected)  { paintPen.setStyle(DashLine); }
-    if (objScene->property(ENABLE_LWT).toBool()) { paintPen = lineWeightPen(); }
-    painter->setPen(paintPen);
-
-    if (normalPath.elementCount()) {
-        painter->drawPath(normalPath);
-        QPainterPath::Element zero = normalPath.elementAt(0);
-        QPainterPath::Element last = normalPath.elementAt(normalPath.elementCount()-1);
-        painter->drawLine(EmbVector(zero.x, zero.y), EmbVector(last.x, last.y));
-    }
 }
 
 int polygon_findIndex(EmbVector point)
@@ -17543,12 +17208,6 @@ emb_rect(EmbReal x, EmbReal y, EmbReal w, EmbReal h)
     rect.w = w;
     rect.h = h;
     return rect;
-}
-
-EmbReal
-embRect_area(EmbRect rect)
-{
-    return rect.w * rect.h;
 }
 
 //NOTE: This void should be used to interpret various object types and save them as polylines for stitchOnly formats.
@@ -19150,6 +18809,7 @@ emb_pattern_addRectAbs(EmbPattern* p, EmbRect rect)
     emb_array_addRect(p->geometry, rect);
 }
 
+/* . */
 void
 emb_pattern_end(EmbPattern *p)
 {
@@ -19578,258 +19238,8 @@ threadColorName(unsigned int color, int brand)
 
 /* The Geometry System
  * -----------------------------------------------------------------------------
+ * TODO: error reporting for improper EmbGeometry type passing.
  */
-
-/* . */
-EmbReal
-emb_get_real(EmbGeometry *g, int id)
-{
-    switch (id) {
-    case EMB_REAL_ARC_RADIUS: {
-        break;
-    }
-    case EMB_REAL_START_ANGLE: {
-        break;
-    }
-    case EMB_REAL_END_ANGLE: {
-        break;
-    }
-    case EMB_REAL_ARC_DIAMETER: {
-        break;
-    }
-    case EMB_REAL_ARC_AREA: {
-        break;
-    }
-    case EMB_REAL_ARC_CIRCUMFERENCE: {
-        break;
-    }
-    case EMB_REAL_ARC_LENGTH: {
-        break;
-    }
-    case EMB_REAL_CHORD: {
-        switch (g->type) {
-        case EMB_ARC: {
-            return emb_vector_distance(g->object.arc.start, g->object.arc.end);
-        }
-        case EMB_CIRCLE: {
-            puts("ERROR: CIRCLE has no REAL_ANGLE property.");
-            return 0.0f;
-        }
-        default:
-            break;
-        }
-        break;
-        break;
-    }
-    case EMB_REAL_TEXT_SIZE: {
-        break;
-    }
-    case EMB_REAL_RADIUS_MAJOR: {
-        break;
-    }
-    case EMB_REAL_RADIUS_MINOR: {
-        break;
-    }
-    case EMB_REAL_DIAMETER_MAJOR: {
-        break;
-    }
-    case EMB_REAL_DIAMETER_MINOR: {
-        break;
-    }
-    case EMB_REAL_LENGTH: {
-        break;
-    }
-    case EMB_REAL_AREA: {
-        break;
-    }
-    case EMB_REAL_ANGLE: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            puts("ERROR: CIRCLE has no REAL_ANGLE property.");
-            return 0.0f;
-        }
-        default:
-            break;
-        }
-        break;
-    }
-    case EMB_REAL_WIDTH: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            return 2.0f * g->object.circle.radius;
-        }
-        case EMB_ELLIPSE: {
-            return 2.0f * g->object.ellipse.radius.x;
-        }
-        default:
-            break;
-        }
-        break;
-    }
-    case EMB_REAL_HEIGHT: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            return 2.0f * g->object.circle.radius;
-        }
-        case EMB_ELLIPSE: {
-            return 2.0f * g->object.ellipse.radius.y;
-        }
-        default:
-            break;
-        }
-        break;
-    }
-    default:
-        break;
-    }
-    return 0.0f;    
-}
-
-/* . */
-EmbVector
-emb_get_vector(EmbGeometry *g, int id)
-{
-    EmbVector v;
-    v.x = 0.0f;
-    v.y = 0.0f;
-    switch (id) {
-    default: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            break;
-        }
-        default:
-            break;
-        }
-    }
-    }
-    return v;
-}
-
-/* . */
-int
-emb_get_int(EmbGeometry *g, int id)
-{
-    switch (id) {
-    default: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            break;
-        }
-        default:
-            break;
-        }
-    }
-    }
-    return 0;
-}
-
-/* . */
-void
-emb_set_real(EmbGeometry *g, int id, EmbReal r)
-{
-    switch (id) {
-    case EMB_REAL_ARC_RADIUS: {
-        break;
-    }
-    case EMB_REAL_START_ANGLE: {
-        break;
-    }
-    case EMB_REAL_END_ANGLE: {
-        break;
-    }
-    case EMB_REAL_ARC_DIAMETER: {
-        break;
-    }
-    case EMB_REAL_ARC_AREA: {
-        break;
-    }
-    case EMB_REAL_ARC_CIRCUMFERENCE: {
-        break;
-    }
-    case EMB_REAL_ARC_LENGTH: {
-        break;
-    }
-    case EMB_REAL_CHORD: {
-        break;
-    }
-    case EMB_REAL_TEXT_SIZE: {
-        break;
-    }
-    case EMB_REAL_RADIUS_MAJOR: {
-        break;
-    }
-    case EMB_REAL_RADIUS_MINOR: {
-        break;
-    }
-    case EMB_REAL_DIAMETER_MAJOR: {
-        break;
-    }
-    case EMB_REAL_DIAMETER_MINOR: {
-        break;
-    }
-    case EMB_REAL_LENGTH: {
-        break;
-    }
-    case EMB_REAL_AREA: {
-        break;
-    }
-    case EMB_REAL_ANGLE: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            break;
-        }
-        default:
-            break;
-        }
-        break;
-    }
-    case EMB_REAL_WIDTH:
-    case EMB_REAL_HEIGHT:
-        break;
-    default:
-        break;
-    }
-}
-
-/* . */
-void
-emb_set_vector(EmbGeometry *g, int id, EmbVector v)
-{
-    switch (id) {
-    case EMB_VECTOR_ARC_START_POINT: {
-        switch (g->type) {
-        case EMB_CIRCLE: {
-            break;
-        }
-        default:
-            break;
-        }
-        break;
-    }
-    default:
-        break;
-    }
-}
-
-/* . */
-void
-emb_set_int(EmbGeometry *g, int id, int i)
-{
-    switch (g->type) {
-    case EMB_CIRCLE: {
-        break;
-    }
-    default:
-        break;
-    }
-}
-
-#define NUMBINS   10
-
-double epsilon = 0.000000001;
-
-double emb_included_angle(EmbGeometry *geometry);
 
 int
 emb_approx(EmbVector point1, EmbVector point2)
@@ -19839,15 +19249,35 @@ emb_approx(EmbVector point1, EmbVector point2)
 
 /* FIXME */
 double
-emb_width(EmbGeometry *geometry)
+emb_width(EmbGeometry *g)
 {
+    switch (g->type) {
+    case EMB_CIRCLE: {
+        return 2.0f * g->object.circle.radius;
+    }
+    case EMB_ELLIPSE: {
+        return 2.0f * g->object.ellipse.radius.x;
+    }
+    default:
+        break;
+    }
     return 1.0;
 }
 
-/* FIXME */
+/* FIXME: finish all types. */
 double
-emb_height(EmbGeometry *geometry)
+emb_height(EmbGeometry *g)
 {
+    switch (g->type) {
+    case EMB_CIRCLE: {
+        return 2.0f * g->object.circle.radius;
+    }
+    case EMB_ELLIPSE: {
+        return 2.0f * g->object.ellipse.radius.y;
+    }
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19855,6 +19285,10 @@ emb_height(EmbGeometry *geometry)
 double
 emb_radius(EmbGeometry *geometry)
 {
+    switch (g->type) {
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19862,6 +19296,10 @@ emb_radius(EmbGeometry *geometry)
 double
 emb_radius_major(EmbGeometry *geometry)
 {
+    switch (g->type) {
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19869,6 +19307,10 @@ emb_radius_major(EmbGeometry *geometry)
 double
 emb_radius_minor(EmbGeometry *geometry)
 {
+    switch (g->type) {
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19876,6 +19318,10 @@ emb_radius_minor(EmbGeometry *geometry)
 double
 emb_diameter_major(EmbGeometry *geometry)
 {
+    switch (g->type) {
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19883,6 +19329,10 @@ emb_diameter_major(EmbGeometry *geometry)
 double
 emb_diameter_minor(EmbGeometry *geometry)
 {
+    switch (g->type) {
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19890,6 +19340,10 @@ emb_diameter_minor(EmbGeometry *geometry)
 double
 emb_diameter(EmbGeometry *geometry)
 {
+    switch (g->type) {
+    default:
+        break;
+    }
     return 1.0;
 }
 
@@ -19983,21 +19437,22 @@ emb_arc_length(EmbGeometry *geometry)
 
 /* . */
 double
-emb_area(EmbGeometry *geometry)
+emb_area(EmbGeometry *g)
 {
-    switch (geometry->type) {
+    switch (g->type) {
     case EMB_ARC: {
         /* Area of a circular segment */
-        double r = emb_radius(geometry);
-        double theta = radians(emb_included_angle(geometry));
+        double r = emb_radius(g);
+        double theta = radians(emb_included_angle(g));
         return ((r*r)/2) * (theta - sin(theta));
     }
     case EMB_CIRCLE: {
-        double r = geometry->object.circle.radius;
+        double r = g->object.circle.radius;
         return embConstantPi * r * r;
     }
-    case EMB_IMAGE:
     case EMB_RECT:
+        return g->object.rect.w * g->object.rect.h;
+    case EMB_IMAGE:
     default:
         break;
     }
@@ -20010,7 +19465,8 @@ emb_chord(EmbGeometry *geometry)
 {
     switch (geometry->type) {
     case EMB_ARC: {
-        return emb_vector_distance(geometry->object.arc.start, geometry->object.arc.end);
+        return emb_vector_distance(geometry->object.arc.end,
+            geometry->object.arc.start);
     }
     default:
         break;

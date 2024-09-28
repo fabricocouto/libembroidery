@@ -387,35 +387,6 @@ extern "C" {
 #define EMB_BRAND_PEC                             5
 #define EMB_BRAND_SVG                             6
 
-/* Point identifiers. */
-#define EMB_VECTOR_ARC_START_POINT                0
-#define EMB_VECTOR_ARC_MID_POINT                  1
-#define EMB_VECTOR_ARC_END_POINT                  2
-#define EMB_VECTOR_ARC_POSITION                   3
-
-/* Real Identifiers */
-#define EMB_REAL_ARC_RADIUS                       0
-#define EMB_REAL_START_ANGLE                      1
-#define EMB_REAL_END_ANGLE                        2
-#define EMB_REAL_ARC_DIAMETER                     3
-#define EMB_REAL_ARC_AREA                         4
-#define EMB_REAL_ARC_CIRCUMFERENCE                5
-#define EMB_REAL_ARC_LENGTH                       6
-#define EMB_REAL_CHORD                            7
-#define EMB_REAL_TEXT                             8
-#define EMB_REAL_TEXT_FONT                        9
-#define EMB_REAL_TEXT_JUSTIFY                    10
-#define EMB_REAL_TEXT_SIZE                       11
-#define EMB_REAL_RADIUS_MAJOR                    12
-#define EMB_REAL_RADIUS_MINOR                    13
-#define EMB_REAL_DIAMETER_MAJOR                  14
-#define EMB_REAL_DIAMETER_MINOR                  15
-#define EMB_REAL_LENGTH                          16
-#define EMB_REAL_AREA                            17
-#define EMB_REAL_ANGLE                           18
-#define EMB_REAL_WIDTH                           19
-#define EMB_REAL_HEIGHT                          20
-
 /* UTILITY MACROS
  * --------------
  */
@@ -1057,14 +1028,6 @@ EMB_PUBLIC EmbReal emb_vector_angle(EmbVector v);
 EMB_PUBLIC EmbReal emb_vector_distance(EmbVector a, EmbVector b);
 EMB_PUBLIC EmbVector emb_vector_unit(EmbReal angle);
 
-EMB_PUBLIC EmbReal emb_get_real(EmbGeometry *g, int id);
-EMB_PUBLIC EmbVector emb_get_vector(EmbGeometry *g, int id);
-EMB_PUBLIC int emb_get_int(EmbGeometry *g, int id);
-
-EMB_PUBLIC void emb_set_real(EmbGeometry *g, int id, EmbReal r);
-EMB_PUBLIC void emb_set_vector(EmbGeometry *g, int id, EmbVector v);
-EMB_PUBLIC void emb_set_int(EmbGeometry *g, int id, int i);
-
 EMB_PUBLIC EmbGeometry emb_arc(EmbReal, EmbReal, EmbReal, EmbReal, EmbReal, EmbReal);
 EMB_PUBLIC char emb_arc_clockwise(EmbGeometry arc);
 EMB_PUBLIC EmbVector emb_arc_center(EmbGeometry arc);
@@ -1173,6 +1136,57 @@ EMB_PUBLIC char emb_pattern_writeAuto(EmbPattern *pattern, const char* fileName)
 EMB_PUBLIC int emb_round(EmbReal x);
 EMB_PUBLIC EmbReal radians(EmbReal degree);
 EMB_PUBLIC EmbReal degrees(EmbReal radian);
+
+/* ---------------------------------- Geometry ----------------------------- */
+
+EMB_PUBLIC uint32_t emb_pattern_real_count(EmbPattern *pattern);
+EMB_PUBLIC uint32_t emb_pattern_count_type(EmbPattern *pattern, uint32_t flags);
+EMB_PUBLIC double emb_pattern_shortest_stitch(EmbPattern *pattern);
+EMB_PUBLIC double emb_pattern_longest_stitch(EmbPattern *pattern);
+EMB_PUBLIC void emb_color_histogram(EmbPattern *pattern, int **bins);
+EMB_PUBLIC void emb_length_histogram(EmbPattern *pattern, int *bins);
+EMB_PUBLIC double emb_total_thread_length(EmbPattern *pattern);
+EMB_PUBLIC double emb_total_thread_of_color(EmbPattern *pattern, int thread_index);
+
+EMB_PUBLIC int emb_approx(EmbVector point1, EmbVector point2);
+
+EMB_PUBLIC EmbVector scale_and_rotate(EmbVector v, double angle, double scale);
+
+EMB_PUBLIC double emb_width(EmbGeometry *geometry);
+EMB_PUBLIC double emb_height(EmbGeometry *geometry);
+EMB_PUBLIC double emb_radius(EmbGeometry *geometry);
+EMB_PUBLIC double emb_radius_major(EmbGeometry *geometry);
+EMB_PUBLIC double emb_radius_minor(EmbGeometry *geometry);
+EMB_PUBLIC double emb_diameter(EmbGeometry *geometry);
+EMB_PUBLIC double emb_diameter_major(EmbGeometry *geometry);
+EMB_PUBLIC double emb_diameter_minor(EmbGeometry *geometry);
+EMB_PUBLIC EmbVector emb_quadrant(EmbGeometry *geometry, int degrees);
+EMB_PUBLIC double emb_angle(EmbGeometry *geometry);
+EMB_PUBLIC double emb_start_angle(EmbGeometry *geometry);
+EMB_PUBLIC double emb_end_angle(EmbGeometry *geometry);
+EMB_PUBLIC double emb_arc_length(EmbGeometry *geometry);
+EMB_PUBLIC double emb_area(EmbGeometry *geometry);
+EMB_PUBLIC double emb_chord(EmbGeometry *geometry);
+EMB_PUBLIC double emb_included_angle(EmbGeometry *geometry);
+EMB_PUBLIC bool emb_clockwise(EmbGeometry *geometry);
+EMB_PUBLIC double emb_circumference(EmbGeometry *geometry);
+
+EMB_PUBLIC void emb_set_start_angle(EmbGeometry *geometry, double angle);
+EMB_PUBLIC void emb_set_end_angle(EmbGeometry *geometry, double angle);
+EMB_PUBLIC void emb_set_start_point(EmbGeometry *geometry, EmbVector point);
+EMB_PUBLIC void emb_set_mid_point(EmbGeometry *geometry, EmbVector point);
+EMB_PUBLIC void emb_set_end_point(EmbGeometry *geometry, EmbVector point);
+EMB_PUBLIC void emb_set_diameter(EmbGeometry *geometry, double diameter);
+EMB_PUBLIC void emb_set_area(EmbGeometry *geometry, double area);
+EMB_PUBLIC void emb_set_circumference(EmbGeometry *geometry, double circumference);
+EMB_PUBLIC void emb_set_radius(EmbGeometry *geometry, double radius);
+EMB_PUBLIC void emb_set_radius_major(EmbGeometry *geometry, double radius);
+EMB_PUBLIC void emb_set_radius_minor(EmbGeometry *geometry, double radius);
+EMB_PUBLIC void emb_set_diameter_major(EmbGeometry *geometry, double diameter);
+EMB_PUBLIC void emb_set_diameter_minor(EmbGeometry *geometry, double diameter);
+
+EMB_PUBLIC char *emb_get_svg_token(char *svg, char token[MAX_STRING_LENGTH]);
+EMB_PUBLIC char *emb_get_svg_vector(char *svg, EmbVector *v);
 
 /* NON-MACRO CONSTANTS
  ******************************************************************************/
