@@ -1139,8 +1139,8 @@ EMB_PUBLIC EmbReal degrees(EmbReal radian);
 
 /* ---------------------------------- Geometry ----------------------------- */
 
-EMB_PUBLIC uint32_t emb_pattern_real_count(EmbPattern *pattern);
-EMB_PUBLIC uint32_t emb_pattern_count_type(EmbPattern *pattern, uint32_t flags);
+EMB_PUBLIC int emb_pattern_real_count(EmbPattern *pattern);
+EMB_PUBLIC int emb_pattern_count_type(EmbPattern *pattern, int flags);
 EMB_PUBLIC double emb_pattern_shortest_stitch(EmbPattern *pattern);
 EMB_PUBLIC double emb_pattern_longest_stitch(EmbPattern *pattern);
 EMB_PUBLIC void emb_color_histogram(EmbPattern *pattern, int **bins);
@@ -1168,7 +1168,7 @@ EMB_PUBLIC double emb_arc_length(EmbGeometry *geometry);
 EMB_PUBLIC double emb_area(EmbGeometry *geometry);
 EMB_PUBLIC double emb_chord(EmbGeometry *geometry);
 EMB_PUBLIC double emb_included_angle(EmbGeometry *geometry);
-EMB_PUBLIC bool emb_clockwise(EmbGeometry *geometry);
+EMB_PUBLIC char emb_clockwise(EmbGeometry *geometry);
 EMB_PUBLIC double emb_circumference(EmbGeometry *geometry);
 
 EMB_PUBLIC void emb_set_start_angle(EmbGeometry *geometry, double angle);

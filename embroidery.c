@@ -17,7 +17,7 @@
 
 #include "embroidery.h"
 
-#define NUMBINS   10
+const int NUMBINS = 10;
 
 double epsilon = 0.000000001;
 
@@ -4803,7 +4803,7 @@ testMain(int test_index)
 
         bulge = -0.414213562373095f;
         center = emb_arc_center(g);
-        chord = emb_get_real(&g, EMB_REAL_CHORD);
+        chord = emb_chord(&g);
         radius = emb_arc_radius(g);
         diameter = emb_arc_diameter(g);
         chordMid = emb_arc_chordMid(g);
@@ -4825,7 +4825,7 @@ testMain(int test_index)
         /* FIXME: midpoints */
         g = emb_arc(4.0, 0.0, 0.0, 0.0, 5.0, 1.0);
         center = emb_arc_center(g);
-        chord = emb_get_real(&g, EMB_REAL_CHORD);
+        chord = emb_chord(&g);
         radius = emb_arc_radius(g);
         diameter = emb_arc_diameter(g);
         chordMid = emb_arc_chordMid(g);
@@ -15543,7 +15543,7 @@ emb_arc_radius(EmbGeometry g)
         return 0.0;
     }
     EmbReal incAngle = emb_arc_incAngle(g);
-    EmbReal chord = emb_get_real(&g, EMB_REAL_CHORD);
+    EmbReal chord = emb_chord(&g);
     return fabs(chord / (2.0 * sin(incAngle / 2.0)));
 }
 
@@ -15590,7 +15590,7 @@ emb_arc_sagitta(EmbGeometry g)
         /* ERROR */
         return 0.0;
     }
-    EmbReal chord = emb_get_real(&g, EMB_REAL_CHORD);
+    EmbReal chord = emb_chord(&g);
     EmbReal bulge = emb_arc_bulge(g);
     return fabs((chord / 2.0) * bulge);
 }
@@ -15752,7 +15752,7 @@ emb_arc_includedAngle(EmbArc arc)
 {
     printf("%f", arc.start.x);
     /*
-    float chord = get_real(gdata, EMB_REAL_CHORD);
+    EmbReal chord = emb_chord(&g);
     float rad = objectRadius();
     if (chord <= 0 || rad <= 0) return 0; //Prevents division by zero and non-existant circles
 
@@ -18949,7 +18949,6 @@ emb_pattern_designDetails(EmbPattern *pattern)
     }
 
     //second pass to fill bins now that we know max stitch length
-#define NUMBINS 10
     int bin[NUMBINS+1];
     int i;
     for (i = 0; i <= NUMBINS; i++) {
@@ -19281,9 +19280,9 @@ emb_height(EmbGeometry *g)
     return 1.0;
 }
 
-/* FIXME */
+/* FIXME: finish all types. */
 double
-emb_radius(EmbGeometry *geometry)
+emb_radius(EmbGeometry *g)
 {
     switch (g->type) {
     default:
@@ -19294,7 +19293,7 @@ emb_radius(EmbGeometry *geometry)
 
 /* FIXME */
 double
-emb_radius_major(EmbGeometry *geometry)
+emb_radius_major(EmbGeometry *g)
 {
     switch (g->type) {
     default:
@@ -19305,7 +19304,7 @@ emb_radius_major(EmbGeometry *geometry)
 
 /* FIXME */
 double
-emb_radius_minor(EmbGeometry *geometry)
+emb_radius_minor(EmbGeometry *g)
 {
     switch (g->type) {
     default:
@@ -19316,7 +19315,7 @@ emb_radius_minor(EmbGeometry *geometry)
 
 /* FIXME */
 double
-emb_diameter_major(EmbGeometry *geometry)
+emb_diameter_major(EmbGeometry *g)
 {
     switch (g->type) {
     default:
@@ -19327,7 +19326,7 @@ emb_diameter_major(EmbGeometry *geometry)
 
 /* FIXME */
 double
-emb_diameter_minor(EmbGeometry *geometry)
+emb_diameter_minor(EmbGeometry *g)
 {
     switch (g->type) {
     default:
@@ -19338,7 +19337,7 @@ emb_diameter_minor(EmbGeometry *geometry)
 
 /* FIXME */
 double
-emb_diameter(EmbGeometry *geometry)
+emb_diameter(EmbGeometry *g)
 {
     switch (g->type) {
     default:
@@ -19456,7 +19455,7 @@ emb_area(EmbGeometry *g)
     default:
         break;
     }
-    return fabs(emb_width(geometry) * emb_height(geometry));
+    return fabs(emb_width(g) * emb_height(g));
 }
 
 /* . */
@@ -19502,7 +19501,7 @@ emb_included_angle(EmbGeometry *geometry)
 }
 
 /* . */
-bool
+char
 emb_clockwise(EmbGeometry *geometry)
 {
     switch (geometry->type) {
@@ -20267,11 +20266,11 @@ emb_stitch_length(EmbStitch prev_st, EmbStitch st)
 /* Returns the number of real stitches in a pattern.
  * We consider SEQUIN to be a real stitch in this count.
  */
-uint32_t
+int
 emb_pattern_real_count(EmbPattern *pattern)
 {
     int i;
-    uint32_t total = 0;
+    int total = 0;
     for (i = 0; i < pattern->stitch_list->count; i++) {
         EmbStitch st = pattern->stitch_list->stitch[i];
         if (!(st.flags & (JUMP | TRIM))) {
@@ -20335,11 +20334,11 @@ emb_pattern_shortest_stitch(EmbPattern *pattern)
  *
  *     emb_pattern_count_type(pattern, TRIM | STOP);
  */
-uint32_t
-emb_pattern_count_type(EmbPattern *pattern, uint32_t flag)
+int
+emb_pattern_count_type(EmbPattern *pattern, int flag)
 {
     int i;
-    uint32_t total = 0;
+    int total = 0;
     for (i = 0; i < pattern->stitch_list->count; i++) {
         EmbStitch st = pattern->stitch_list->stitch[i];
         if (st.flags & flag) {
